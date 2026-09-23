@@ -1,0 +1,66 @@
+# Local development defaults: one pod with a disposable in-memory database.
+replicaCount: 1
+
+image:
+  repository: movies-api
+  tag: "0.0.1-SNAPSHOT"
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 8080
+
+springProfilesActive: local
+# Non-secret environment variables. SERVER_PORT is fixed at 8080 by the chart.
+env: {}
+# Existing Secrets whose keys are environment variable names, e.g.
+# APP_ADMIN_EMAIL and APP_ADMIN_PASSWORD for optional admin bootstrap.
+existingSecrets: []
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: movies.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+# TCP checks work with the existing authenticated API. They check the listener,
+# not database health. Replace with HTTP probes if Actuator is added later.
+startupProbe:
+  tcpSocket:
+    port: http
+  periodSeconds: 5
+  timeoutSeconds: 2
+  failureThreshold: 60
+readinessProbe:
+  tcpSocket:
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
+livenessProbe:
+  tcpSocket:
+    port: http
+  periodSeconds: 20
+  timeoutSeconds: 2
+  failureThreshold: 3
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

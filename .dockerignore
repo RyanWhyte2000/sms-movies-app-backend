@@ -1,0 +1,12 @@
+.git
+.idea
+.vscode
+.agents
+.codex
+target
+*.iml
+*.log
+.env
+.env.*
+cookies.txt
+.DS_Store

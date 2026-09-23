@@ -1,0 +1,14 @@
+Release {{ .Release.Name }} is configured in namespace {{ .Release.Namespace }}.
+
+Access the API locally:
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "movies.fullname" . }} 8080:{{ .Values.service.port }}
+
+Register and sign in through /api/auth/register and /api/auth/login.
+Fetch /api/csrf before writes and again after login. There is no default account.
+For catalogue administration, optionally supply APP_ADMIN_EMAIL and
+APP_ADMIN_PASSWORD through an existing Secret. See docs/frontend-api.md.
+
+{{- if has "local" (splitList "," (.Values.springProfilesActive | replace " " "")) }}
+
+The local profile uses an in-memory database. Data is lost on pod restart or upgrade.
+{{- end }}
