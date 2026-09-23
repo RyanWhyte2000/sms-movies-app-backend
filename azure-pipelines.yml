@@ -1,0 +1,110 @@
+# Azure DevOps Services CI. Registry push and deployment require service connections.
+name: movies-$(Date:yyyyMMdd).$(Rev:r)
+
+trigger:
+  batch: true
+  branches:
+    include:
+      - '*'
+
+# For Azure Repos, configure a Build validation branch policy instead.
+pr:
+  autoCancel: true
+  branches:
+    include:
+      - '*'
+
+pool:
+  vmImage: ubuntu-24.04
+
+variables:
+  mavenCache: $(Pipeline.Workspace)/.m2/repository
+  helmVersion: '3.17.3'
+
+jobs:
+  - job: BuildAndTest
+    displayName: Build, test and package
+    timeoutInMinutes: 30
+    steps:
+      - checkout: self
+        clean: true
+
+      - task: JavaToolInstaller@0
+        displayName: Use Java 17
+        inputs:
+          versionSpec: '17'
+          jdkArchitectureOption: x64
+          jdkSourceOption: PreInstalled
+
+      - task: Cache@2
+        displayName: Cache Maven dependencies
+        inputs:
+          key: 'maven | "$(Agent.OS)" | pom.xml | .mvn/wrapper/maven-wrapper.properties'
+          restoreKeys: |
+            maven | "$(Agent.OS)"
+          path: $(mavenCache)
+
+      - bash: |
+          set -euo pipefail
+          bash ./mvnw -B -ntp "-Dmaven.repo.local=$MAVEN_CACHE" clean verify
+        displayName: Compile, test and package with Maven wrapper
+        env:
+          MAVEN_CACHE: $(mavenCache)
+
+      - task: PublishTestResults@2
+        displayName: Publish JUnit results
+        condition: succeededOrFailed()
+        inputs:
+          testResultsFormat: JUnit
+          testResultsFiles: '**/surefire-reports/TEST-*.xml'
+          searchFolder: $(System.DefaultWorkingDirectory)/target
+          mergeTestResults: true
+          failTaskOnFailedTests: true
+          failTaskOnMissingResultsFile: true
+          testRunTitle: Movies API — Java 17
+
+      - task: HelmInstaller@1
+        displayName: Install Helm
+        inputs:
+          helmVersionToInstall: $(helmVersion)
+
+      - bash: |
+          set -euo pipefail
+          mkdir -p "$ARTIFACT_DIR/helm"
+          helm lint ./helm/movies --strict
+          helm template movies ./helm/movies > "$ARTIFACT_DIR/helm/rendered-local.yaml"
+          helm package ./helm/movies --destination "$ARTIFACT_DIR/helm"
+        displayName: Validate and package Helm chart
+        env:
+          ARTIFACT_DIR: $(Build.ArtifactStagingDirectory)
+
+      # Build only: no registry credentials or cloud resources are required.
+      # The Dockerfile also runs tests to validate its Java 17 build environment.
+      - task: Docker@2
+        displayName: Validate Docker image build
+        inputs:
+          command: build
+          repository: movies-api
+          Dockerfile: $(Build.SourcesDirectory)/Dockerfile
+          buildContext: $(Build.SourcesDirectory)
+          tags: |
+            $(Build.BuildId)
+
+      - bash: |
+          set -euo pipefail
+          mkdir -p "$ARTIFACT_DIR/app" "$ARTIFACT_DIR/docs"
+          cp target/movies-*.jar "$ARTIFACT_DIR/app/"
+          cp README.md "$ARTIFACT_DIR/"
+          cp azure-pipelines.yml "$ARTIFACT_DIR/"
+          cp -R docs/. "$ARTIFACT_DIR/docs/"
+          cp -R helm/movies "$ARTIFACT_DIR/helm/"
+        displayName: Stage application and documentation
+        env:
+          ARTIFACT_DIR: $(Build.ArtifactStagingDirectory)
+
+      - task: PublishPipelineArtifact@1
+        displayName: Publish application and Helm artifacts
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)
+          artifact: movies-build
+          publishLocation: pipeline

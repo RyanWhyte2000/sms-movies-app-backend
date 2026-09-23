@@ -62,6 +62,13 @@ The [Helm chart](helm/movies/README.md) includes a Deployment, Service, optional
 ingress, probes and Secret references. Its default is one pod with the local
 in-memory database. Make the image available to the cluster before installation.
 
+## Azure Pipelines
+
+[`azure-pipelines.yml`](azure-pipelines.yml) builds and tests the API with Java 17,
+validates the Docker image and Helm chart, and publishes build artifacts. See the
+[pipeline setup guide](docs/azure-pipelines.md) to connect it to Azure DevOps.
+Registry publishing, deployment, and coverage enforcement are not configured yet.
+
 ## Database changes
 
 Flyway migrations live in `src/main/resources/db/migration`. V1 creates the original
