@@ -216,40 +216,14 @@ stages:
                   --query loginServer \
                   --output tsv \
                   --only-show-errors > "$AGENT_TEMPDIRECTORY/acr-login-server"
-                az acr show \
-                  --name "$(acrName)" \
-                  --query id \
-                  --output tsv \
-                  --only-show-errors > "$AGENT_TEMPDIRECTORY/acr-resource-id"
                 read -r login_server < "$AGENT_TEMPDIRECTORY/acr-login-server"
-                read -r acr_resource_id < "$AGENT_TEMPDIRECTORY/acr-resource-id"
                 image="${login_server}/movies-api:$(Build.BuildId)"
 
                 az containerapp identity assign \
                   --name "$(containerAppName)" \
                   --resource-group "$(azureResourceGroup)" \
                   --system-assigned \
-                  --query principalId \
-                  --output tsv \
-                  --only-show-errors > "$AGENT_TEMPDIRECTORY/container-app-principal-id"
-                read -r principal_id < "$AGENT_TEMPDIRECTORY/container-app-principal-id"
-
-                az role assignment list \
-                  --assignee-object-id "$principal_id" \
-                  --scope "$acr_resource_id" \
-                  --role AcrPull \
-                  --query 'length(@)' \
-                  --output tsv \
-                  --only-show-errors > "$AGENT_TEMPDIRECTORY/acr-pull-role-count"
-                read -r role_count < "$AGENT_TEMPDIRECTORY/acr-pull-role-count"
-                if [[ "$role_count" == "0" ]]; then
-                  az role assignment create \
-                    --assignee-object-id "$principal_id" \
-                    --assignee-principal-type ServicePrincipal \
-                    --role AcrPull \
-                    --scope "$acr_resource_id" \
-                    --only-show-errors > /dev/null
-                fi
+                  --only-show-errors > /dev/null
 
                 az containerapp registry set \
                   --name "$(containerAppName)" \
@@ -279,7 +253,7 @@ stages:
                   --query "properties.configuration.ingress.fqdn" \
                   --output tsv
             env:
-              DATABASE_URL: $(jdbc:postgresql://aws-0-ca-central-1.pooler.supabase.com:5432/postgres)
-              DATABASE_USERNAME: $(postgres.ecyuhlrrudlukwrlpjbv)
-              DATABASE_PASSWORD: $(JAv12M5uUjoFMqE4)
+              DATABASE_URL: $(DATABASE_URL)
+              DATABASE_USERNAME: $(DATABASE_USERNAME)
+              DATABASE_PASSWORD: $(DATABASE_PASSWORD)
               APP_CORS_ALLOWED_ORIGINS: $(APP_CORS_ALLOWED_ORIGINS)

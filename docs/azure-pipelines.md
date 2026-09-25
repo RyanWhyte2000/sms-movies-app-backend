@@ -37,13 +37,35 @@ GitHub; Azure Repos uses branch policies instead.
 Create or select these resources before the first image push:
 
 1. An Azure Resource Manager service connection named `smsmovies2` with
-   the `AcrPush` role on the registry. To let the pipeline create the app's
-   `AcrPull` assignment, it also needs Owner or User Access Administrator on the
-   registry scope.
+   `AcrPush` on the registry and permission to update the Container App. The
+   pipeline deliberately does not create role assignments, so this connection
+   does not need Owner or User Access Administrator.
 2. An Azure Container Registry matching `acrName` in the pipeline. Registry names
    are globally unique.
-3. A resource group named `sms-movies` and a Consumption-plan Container Apps
-   environment named `sms-movies-env` in `eastus`.
+3. A resource group named `sms-movies`, a Consumption-plan Container Apps
+   environment, and a Container App named `smsmovies` in `westus2`.
+
+Before the first deployment, an Azure subscription Owner or User Access
+Administrator must grant the Container App's system-assigned identity `AcrPull`
+on the registry. This is a one-time setup action:
+
+```bash
+principal_id=$(az containerapp identity assign \
+  --name smsmovies \
+  --resource-group sms-movies \
+  --system-assigned \
+  --query principalId \
+  --output tsv)
+acr_id=$(az acr show --name smsMovies --query id --output tsv)
+az role assignment create \
+  --assignee-object-id "$principal_id" \
+  --assignee-principal-type ServicePrincipal \
+  --role AcrPull \
+  --scope "$acr_id"
+```
+
+After that assignment exists, the pipeline configures the app to authenticate to
+ACR with its system identity and deploys without modifying Azure RBAC.
 
 Add `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, and
 `APP_CORS_ALLOWED_ORIGINS` as Azure DevOps pipeline variables. Mark the three
