@@ -8,32 +8,60 @@ The root `azure-pipelines.yml` is a CI pipeline for Azure DevOps Services. It:
 4. Verifies and publishes JaCoCo results to the run's **Code Coverage** tab, and
    publishes the complete HTML report as the `jacoco-html` pipeline artifact.
 5. Lints, renders and packages the Helm chart.
-6. Builds the Docker image to validate the Dockerfile. The image stays on the agent
-   and is not pushed or retained; the Dockerfile runs its own tests as well.
+6. Builds the Docker image to validate the Dockerfile. The Dockerfile runs its own
+   tests as well.
 7. Publishes the executable JAR, packaged chart, rendered local manifests and API
    documentation as the `movies-build` pipeline artifact, only after success.
+8. On successful non-PR builds of `main`, builds and pushes a uniquely tagged image
+   to Azure Container Registry and deploys it to Azure Container Apps.
 
 ## Connect the pipeline
 
 In Azure DevOps, choose **Pipelines → New pipeline**, select the repository, then
 choose **Existing Azure Pipelines YAML file** and `/azure-pipelines.yml`. Save and
 run it. The organization needs permission/capacity to run Microsoft-hosted agents.
-No deployment credentials or application secrets are required for this CI job.
+The build job needs no deployment credentials. The deployment job requires the
+service connection and secret variables described below.
 
 Pushes to all branches trigger builds. For Azure Repos pull-request validation,
 add this pipeline as a **Build validation** policy on each protected target branch.
 The YAML `pr` trigger applies to supported external repository providers such as
 GitHub; Azure Repos uses branch policies instead.
 
-## Scope and next deployment setup
+## Container Apps deployment setup
 
-This file does not push an image, deploy to Kubernetes, or enforce an 80% coverage
-threshold. JaCoCo coverage is reported but is not currently used as a build gate.
-Completing the assessment's delivery requirements still needs a coverage gate, a
-registry service connection, a deployment target/service connection, environment
-configuration, and a successful public deployment through the pipeline.
-Keep those credentials in Azure DevOps service connections or secret variables.
-Never place them directly in this YAML.
+Create or select these resources before the first deployment:
+
+1. An Azure Resource Manager service connection named `sms-movies-azure` with
+   permission to the target resource group.
+2. A resource group named `sms-movies-rg`.
+3. An Azure Container Registry. Change `acrName` in the pipeline because registry
+   names are globally unique.
+4. A Consumption-plan Container Apps environment named `sms-movies-env` in
+   `eastus`. The deployment task creates or updates `sms-movies-api` with external
+   ingress on port 8080, then limits it to 0.5 vCPU, 1 GiB of memory, zero minimum
+   replicas and one maximum replica.
+5. An Azure DevOps environment named `movies-production`. Add approvals there if
+   production releases should require review.
+
+Add these variables through **Pipelines → Library**, the pipeline variables UI, or
+another secret store:
+
+| Variable | Secret | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes | PostgreSQL JDBC URL |
+| `DATABASE_USERNAME` | Yes | Runtime database user |
+| `DATABASE_PASSWORD` | Yes | Runtime database password |
+| `APP_CORS_ALLOWED_ORIGINS` | No | Comma-separated frontend origins |
+
+Do not place their values in YAML. Mark database values secret in Azure DevOps.
+The deployment is intentionally restricted to successful `main` builds and does
+not run for pull-request validation. Container Apps Consumption HTTP ingress uses
+zero as its default minimum replica count, allowing the application to scale to
+zero when idle.
+
+JaCoCo enforces the repository's 80% line-coverage gate during `mvn verify` before
+the deployment job can run.
 
 The rendered chart uses the disposable local database profile. It is a validation
 artifact, not a production deployment configuration.

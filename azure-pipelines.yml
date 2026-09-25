@@ -20,6 +20,15 @@ pool:
 variables:
   mavenCache: $(Pipeline.Workspace)/.m2/repository
   helmVersion: '3.17.3'
+  # Rename these values to match resources in your Azure subscription. The ACR
+  # name must be globally unique and must not include ".azurecr.io".
+  azureServiceConnection: 'sms-movies-azure'
+  azureResourceGroup: 'sms-movies-rg'
+  azureLocation: 'eastus'
+  containerAppEnvironment: 'sms-movies-env'
+  containerAppName: 'sms-movies-api'
+  acrName: 'smsmoviesacr'
+  containerImage: '$(acrName).azurecr.io/movies-api:$(Build.BuildId)'
 
 jobs:
   - job: BuildAndTest
@@ -130,3 +139,64 @@ jobs:
           targetPath: $(Build.ArtifactStagingDirectory)
           artifact: movies-build
           publishLocation: pipeline
+
+  - deployment: DeployContainerApp
+    displayName: Push image and deploy Azure Container App
+    dependsOn: BuildAndTest
+    condition: >-
+      and(
+        succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+        ne(variables['Build.Reason'], 'PullRequest')
+      )
+    timeoutInMinutes: 30
+    environment: movies-production
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - checkout: self
+              clean: true
+
+            - task: AzureContainerApps@1
+              displayName: Build, push and deploy movies API
+              inputs:
+                azureSubscription: $(azureServiceConnection)
+                appSourcePath: $(Build.SourcesDirectory)
+                dockerfilePath: $(Build.SourcesDirectory)/Dockerfile
+                acrName: $(acrName)
+                imageToBuild: $(containerImage)
+                containerAppName: $(containerAppName)
+                resourceGroup: $(azureResourceGroup)
+                containerAppEnvironment: $(containerAppEnvironment)
+                location: $(azureLocation)
+                targetPort: '8080'
+                ingress: external
+                environmentVariables: >-
+                  DATABASE_URL=$(DATABASE_URL)
+                  DATABASE_USERNAME=$(DATABASE_USERNAME)
+                  DATABASE_PASSWORD=$(DATABASE_PASSWORD)
+                  APP_CORS_ALLOWED_ORIGINS=$(APP_CORS_ALLOWED_ORIGINS)
+
+            - task: AzureCLI@2
+              displayName: Apply free-tier scaling limits
+              inputs:
+                azureSubscription: $(azureServiceConnection)
+                scriptType: bash
+                scriptLocation: inlineScript
+                inlineScript: |
+                  set -euo pipefail
+                  az containerapp update \
+                    --name "$(containerAppName)" \
+                    --resource-group "$(azureResourceGroup)" \
+                    --cpu 0.5 \
+                    --memory 1.0Gi \
+                    --min-replicas 0 \
+                    --max-replicas 1 \
+                    --only-show-errors
+                  fqdn="$(az containerapp show \
+                    --name "$(containerAppName)" \
+                    --resource-group "$(azureResourceGroup)" \
+                    --query properties.configuration.ingress.fqdn \
+                    --output tsv)"
+                  echo "Container App URL: https://${fqdn}"

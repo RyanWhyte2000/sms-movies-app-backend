@@ -74,8 +74,9 @@ in-memory database. Make the image available to the cluster before installation.
 validates the Docker image and Helm chart, and publishes build artifacts. See the
 [pipeline setup guide](docs/azure-pipelines.md) to connect it to Azure DevOps.
 JaCoCo results appear in the pipeline's Code Coverage tab and as a downloadable
-`jacoco-html` artifact. Registry publishing, deployment, and coverage enforcement
-are not configured yet.
+`jacoco-html` artifact. Successful `main` builds pass the 80% coverage gate, push
+a uniquely tagged image to Azure Container Registry, and deploy it to Azure
+Container Apps once the documented service connection and variables are configured.
 
 ## Database changes
 
