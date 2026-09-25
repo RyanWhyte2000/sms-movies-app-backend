@@ -58,10 +58,11 @@ public class SecurityConfig {
   }
 
   @Bean
-  SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+  SecurityFilterChain securityFilterChain(
+      HttpSecurity http, CsrfTokenRepository csrfTokenRepository) throws Exception {
     return http.cors(org.springframework.security.config.Customizer.withDefaults())
         .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-        .csrf(csrf -> csrf.disable())
+        .csrf(csrf -> csrf.csrfTokenRepository(csrfTokenRepository))
         .requestCache(c -> c.disable())
         .formLogin(c -> c.disable())
         .httpBasic(c -> c.disable())

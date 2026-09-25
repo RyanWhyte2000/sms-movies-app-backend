@@ -1,6 +1,5 @@
 package com.sms.movies.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sms.movies.service.AuditService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -11,12 +10,12 @@ import java.time.Clock;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -36,18 +35,17 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
   private final int requestLimit;
   private final long windowSeconds;
   private final int maxTrackedClients;
-  private final ObjectMapper objectMapper;
   private final Clock clock;
   private final Map<String, Window> windows = new ConcurrentHashMap<>();
   private final AtomicLong requestCounter = new AtomicLong();
 
+  @Autowired
   public ApiRateLimitFilter(
       @Value("${app.rate-limit.enabled:true}") boolean enabled,
       @Value("${app.rate-limit.requests:120}") int requestLimit,
       @Value("${app.rate-limit.window:60s}") java.time.Duration window,
-      @Value("${app.rate-limit.max-tracked-clients:100000}") int maxTrackedClients,
-      ObjectMapper objectMapper) {
-    this(enabled, requestLimit, window, maxTrackedClients, objectMapper, Clock.systemUTC());
+      @Value("${app.rate-limit.max-tracked-clients:100000}") int maxTrackedClients) {
+    this(enabled, requestLimit, window, maxTrackedClients, Clock.systemUTC());
   }
 
   ApiRateLimitFilter(
@@ -55,7 +53,6 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
       int requestLimit,
       java.time.Duration window,
       int maxTrackedClients,
-      ObjectMapper objectMapper,
       Clock clock) {
     if (requestLimit < 1) throw new IllegalArgumentException("Rate limit must be positive");
     if (window.isZero() || window.isNegative())
@@ -66,7 +63,6 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
     this.requestLimit = requestLimit;
     this.windowSeconds = Math.max(1, window.toSeconds());
     this.maxTrackedClients = maxTrackedClients;
-    this.objectMapper = objectMapper;
     this.clock = clock;
   }
 
@@ -132,12 +128,14 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
     response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
     response.setHeader("Retry-After", Long.toString(Math.max(1, retryAfter)));
-    ProblemDetail problem =
-        ProblemDetail.forStatusAndDetail(
-            HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Please try again later.");
-    problem.setTitle("Too Many Requests");
-    problem.setProperty("correlationId", AuditService.correlationId());
-    objectMapper.writeValue(response.getWriter(), problem);
+    response
+        .getWriter()
+        .write(
+            "{\"type\":\"about:blank\",\"title\":\"Too Many Requests\","
+                + "\"status\":429,\"detail\":\"Too many requests. Please try again later.\","
+                + "\"correlationId\":\""
+                + AuditService.correlationId()
+                + "\"}");
   }
 
   private void addHeaders(HttpServletResponse response, int remaining, long resetAt, long now) {

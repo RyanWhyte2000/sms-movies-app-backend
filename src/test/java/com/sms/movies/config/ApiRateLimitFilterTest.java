@@ -17,7 +17,7 @@ public class ApiRateLimitFilterTest {
 
   @Test
   public void rejectsRequestsAfterClientExhaustsWindow() throws Exception {
-    var filter = new ApiRateLimitFilter(true, 2, Duration.ofSeconds(60), 100, mapper(), CLOCK);
+    var filter = new ApiRateLimitFilter(true, 2, Duration.ofSeconds(60), 100, CLOCK);
     var chainCalls = new AtomicInteger();
 
     MockHttpServletResponse first = invoke(filter, "192.0.2.1", "/api/movies", chainCalls);
@@ -37,7 +37,7 @@ public class ApiRateLimitFilterTest {
 
   @Test
   public void tracksClientsIndependentlyAndIgnoresForwardedAddress() throws Exception {
-    var filter = new ApiRateLimitFilter(true, 1, Duration.ofMinutes(1), 100, mapper(), CLOCK);
+    var filter = new ApiRateLimitFilter(true, 1, Duration.ofMinutes(1), 100, CLOCK);
     var chainCalls = new AtomicInteger();
 
     MockHttpServletRequest first = request("192.0.2.1", "/api/movies");
@@ -54,7 +54,7 @@ public class ApiRateLimitFilterTest {
 
   @Test
   public void skipsNonApiAndPreflightRequests() throws Exception {
-    var filter = new ApiRateLimitFilter(true, 1, Duration.ofMinutes(1), 100, mapper(), CLOCK);
+    var filter = new ApiRateLimitFilter(true, 1, Duration.ofMinutes(1), 100, CLOCK);
     var chainCalls = new AtomicInteger();
 
     invoke(filter, "192.0.2.1", "/swagger-ui/index.html", chainCalls);
