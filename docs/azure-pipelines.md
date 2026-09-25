@@ -13,8 +13,9 @@ The root `azure-pipelines.yml` is a CI pipeline for Azure DevOps Services. It:
 7. Publishes the executable JAR, packaged chart, rendered local manifests and API
    documentation as the `movies-build` pipeline artifact, only after success.
 8. On successful non-PR builds of `main`, runs a dedicated `BuildAndPushImage`
-   stage that uses ACR Tasks to build and push the immutable
-   `movies-api:$(Build.BuildId)` image.
+   stage that builds on the Microsoft-hosted agent and pushes the immutable
+   `movies-api:$(Build.BuildId)` image to ACR. It does not use server-side ACR
+   Tasks, which can be unavailable on free subscriptions.
 
 ## Connect the pipeline
 
@@ -33,7 +34,7 @@ GitHub; Azure Repos uses branch policies instead.
 Create or select these resources before the first image push:
 
 1. An Azure Resource Manager service connection named `smsmovies2` with
-   permission to build images in the registry.
+   the `AcrPush` role on the registry.
 2. An Azure Container Registry matching `acrName` in the pipeline. Registry names
    are globally unique.
 

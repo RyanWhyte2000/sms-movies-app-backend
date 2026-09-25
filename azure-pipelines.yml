@@ -149,16 +149,24 @@ stages:
             clean: true
 
           - task: AzureCLI@2
-            displayName: Build and push image with ACR Tasks
+            displayName: Build locally and push image to ACR
             inputs:
               azureSubscription: $(azureServiceConnection)
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
                 set -euo pipefail
-                az acr build \
-                  --registry "$(acrName)" \
-                  --image "movies-api:$(Build.BuildId)" \
+                az acr show \
+                  --name "$(acrName)" \
+                  --query loginServer \
+                  --output tsv \
+                  --only-show-errors > "$AGENT_TEMPDIRECTORY/acr-login-server"
+                read -r login_server < "$AGENT_TEMPDIRECTORY/acr-login-server"
+                image="${login_server}/movies-api:$(Build.BuildId)"
+                az acr login --name "$(acrName)" --only-show-errors
+                docker build \
                   --file "$(Build.SourcesDirectory)/Dockerfile" \
-                  "$(Build.SourcesDirectory)" \
-                  --only-show-errors
+                  --tag "$image" \
+                  "$(Build.SourcesDirectory)"
+                docker push "$image"
+                echo "Pushed image: $image"
