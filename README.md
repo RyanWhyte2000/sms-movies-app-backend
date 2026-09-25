@@ -42,9 +42,11 @@ With the disposable local database, bootstrap runs again after every app restart
 | `SERVER_SERVLET_SESSION_COOKIE_SAME_SITE` | Default lax; assess explicitly for cross-site deployments |
 
 Passwords and provider keys must not be committed. Public registration always
-creates ordinary users. Catalogue mutations require ADMIN; collection and rating
-ownership is checked against the current session. Share links grant read-only
-access to their holders and can be expired or revoked.
+creates ordinary users. Catalogue mutations, personal-collection maintenance, and
+share-link management require ADMIN; collection ownership is also checked against
+the current session. Personal rating ownership is checked against the current
+session. Share links grant read-only access to their holders and can be expired or
+revoked.
 
 ## Docker
 

@@ -62,6 +62,7 @@ public class MovieService {
         id,
         request.title().strip(),
         request.description(),
+        request.posterUrl(),
         request.director().strip(),
         request.genre().strip(),
         request.releaseDate(),

@@ -51,7 +51,7 @@ public class AnalyticsService {
             org.springframework.http.HttpStatus.CONFLICT, "Event ID is already in use.");
       return;
     }
-    if (sql.count("SELECT COUNT(*) FROM \"movies\" WHERE \"ID\"=?", event.movieId()) == 0)
+    if (sql.count("SELECT COUNT(*) FROM movies WHERE id=?", event.movieId()) == 0)
       throw ApiException.notFound();
     sql.update(
         "INSERT INTO analytics_event(event_id,user_id,event_name,movie_id,journey_id)"

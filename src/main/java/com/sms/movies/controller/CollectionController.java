@@ -10,6 +10,7 @@ import jakarta.validation.constraints.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
         "Manage the authenticated user's movie collections and the movies contained in them.")
 @RestController
 @RequestMapping("/api/me/collections")
+@PreAuthorize("hasRole('ADMIN')")
 public class CollectionController {
   private final CollectionService service;
   private final CurrentUser current;

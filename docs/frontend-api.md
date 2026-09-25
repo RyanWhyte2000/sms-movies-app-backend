@@ -46,19 +46,30 @@ responses never contain password hashes. Login failures use a generic 401 messag
 
 | Method | Path | Result |
 | --- | --- | --- |
-| GET | `/api/movies?q=&castId=&directorId=&genreId=&page=0&size=20` | Paginated movies |
+| GET | `/api/movies?q=&cast=&director=&genreId=&page=0&size=20` | Paginated movies |
 | GET | `/api/movies/{movieId}` | Movie details, credits, genres, externalRatings, personalRating |
 | GET | `/api/genres` | List of `{id, name}` |
 | GET | `/api/people?q=&role=CAST&page=0&size=20` | Paginated `{id, name}`; role also accepts DIRECTOR |
 
+Movie search and detail routes allow anonymous guest access. For guests,
+`personalRating` is null; signing in adds the current user's rating to movie details.
 Filters combine with AND. Text search matches title, description, people and genre
 names case-insensitively. SQL wildcard characters are treated as literal text.
-Movie list fields are `id` (UUID), `title`, `description`, `director`, `genre`,
-`releaseDate`, and `durationMinutes`. Details add relationship arrays and the
+`cast` and `director` accept person UUIDs; the older `castId` and `directorId`
+names remain supported as aliases. If both forms are supplied, the new parameter
+name takes precedence.
+
+Movie list fields are `id` (UUID), `title`, `description`, `posterUrl`, `director`,
+`genre`, `releaseDate`, and `durationMinutes`. Render `posterUrl` as the movie poster;
+it may be null when no picture has been assigned. Details add relationship arrays and the
 signed-in user's rating (null when unrated). External ratings include `source`,
 `score`, `scaleMax`, `voteCount`, and `fetchedAt`.
 
 ## Collections — CollectionController
+
+All collection endpoints in this section require an authenticated ADMIN account.
+Collection ownership is additionally enforced, so an administrator can maintain
+only their own personal collections.
 
 | Method | Path | Body / result |
 | --- | --- | --- |
@@ -89,6 +100,10 @@ one rating per user/movie, enforced by the database. Repeating an unchanged scor
 does not create another audit event. Ratings remain independent of collections.
 
 ## Sharing — ShareController, SharedCollectionController
+
+Creating, listing, and revoking share links requires an authenticated ADMIN account
+that owns the collection. Reading a valid shared link remains anonymous and
+read-only.
 
 | Method | Path | Body / result |
 | --- | --- | --- |
@@ -179,6 +194,7 @@ Movie create/update example:
 {
   "title": "Example Movie",
   "description": "A fictional space comedy.",
+  "posterUrl": "https://example.com/posters/example-movie.jpg",
   "director": "Example Director",
   "genre": "Comedy",
   "releaseDate": "2025-01-01",
@@ -189,7 +205,8 @@ Movie create/update example:
 }
 ```
 
-The three ID lists are optional and refer to existing people/genres. Legacy
+`posterUrl` is optional, must be an HTTP or HTTPS URL, and may point to a public
+Supabase Storage object. The three ID lists are optional and refer to existing people/genres. Legacy
 `director` and `genre` fields remain required and are linked into the normalized
 relationships. They represent the primary names displayed in the movie summary.
 Legacy director names reuse the first matching person; use explicit IDs to

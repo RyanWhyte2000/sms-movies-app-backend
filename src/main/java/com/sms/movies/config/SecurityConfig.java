@@ -58,36 +58,14 @@ public class SecurityConfig {
   }
 
   @Bean
-  SecurityFilterChain securityFilterChain(
-      HttpSecurity http, SecurityContextRepository contexts, CsrfTokenRepository csrf)
-      throws Exception {
+  SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     return http.cors(org.springframework.security.config.Customizer.withDefaults())
-        .authorizeHttpRequests(
-            auth ->
-                auth.requestMatchers(
-                        "/api/auth/register",
-                        "/api/auth/login",
-                        "/api/csrf",
-                        "/api/shared/**",
-                        "/v3/api-docs/**",
-                        "/swagger-ui/**",
-                        "/swagger-ui.html")
-                    .permitAll()
-                    .anyRequest()
-                    .authenticated())
-        .securityContext(c -> c.securityContextRepository(contexts))
-        .csrf(c -> c.csrfTokenRepository(csrf))
+        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+        .csrf(csrf -> csrf.disable())
         .requestCache(c -> c.disable())
         .formLogin(c -> c.disable())
         .httpBasic(c -> c.disable())
         .logout(c -> c.disable())
-        .exceptionHandling(
-            c ->
-                c.authenticationEntryPoint(
-                        (req, res, ex) -> problem(res, 401, "Sign in to continue."))
-                    .accessDeniedHandler(
-                        (req, res, ex) ->
-                            problem(res, 403, "Access denied or invalid CSRF token.")))
         .build();
   }
 

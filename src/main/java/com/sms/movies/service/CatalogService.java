@@ -37,40 +37,42 @@ public class CatalogService {
                   .replace("_", "!_")
               + "%";
       where +=
-          " AND (LOWER(m.\"TITLE\") LIKE ? ESCAPE '!' OR LOWER(m.\"DESCRIPTION\") LIKE ? ESCAPE '!'"
+          " AND (LOWER(m.title) LIKE ? ESCAPE '!' OR LOWER(m.description) LIKE ? ESCAPE '!'"
               + " OR EXISTS (SELECT 1 FROM movie_credit mc JOIN person p ON p.id=mc.person_id WHERE"
-              + " mc.movie_id=m.\"ID\" AND LOWER(p.name) LIKE ? ESCAPE '!') OR EXISTS (SELECT 1"
-              + " FROM movie_genre mg JOIN genre g ON g.id=mg.genre_id WHERE mg.movie_id=m.\"ID\""
+              + " mc.movie_id=m.id AND LOWER(p.name) LIKE ? ESCAPE '!') OR EXISTS (SELECT 1"
+              + " FROM movie_genre mg JOIN genre g ON g.id=mg.genre_id WHERE mg.movie_id=m.id"
               + " AND LOWER(g.name) LIKE ? ESCAPE '!'))";
       args.addAll(List.of(like, like, like, like));
     }
     if (cast != null) {
       where +=
-          " AND EXISTS(SELECT 1 FROM movie_credit c WHERE c.movie_id=m.\"ID\" AND c.person_id=? AND"
+          " AND EXISTS(SELECT 1 FROM movie_credit c WHERE c.movie_id=m.id AND c.person_id=? AND"
               + " c.role='CAST')";
       args.add(cast);
     }
     if (director != null) {
       where +=
-          " AND EXISTS(SELECT 1 FROM movie_credit c WHERE c.movie_id=m.\"ID\" AND c.person_id=? AND"
+          " AND EXISTS(SELECT 1 FROM movie_credit c WHERE c.movie_id=m.id AND c.person_id=? AND"
               + " c.role='DIRECTOR')";
       args.add(director);
     }
     if (genre != null) {
       where +=
-          " AND EXISTS(SELECT 1 FROM movie_genre g WHERE g.movie_id=m.\"ID\" AND g.genre_id=?)";
+          " AND EXISTS(SELECT 1 FROM movie_genre g WHERE g.movie_id=m.id AND g.genre_id=?)";
       args.add(genre);
     }
-    long total = sql.count("SELECT COUNT(*) FROM \"movies\" m" + where, args.toArray());
+    long total = sql.count("SELECT COUNT(*) FROM movies m" + where, args.toArray());
     args.add(size);
     args.add((long) page * size);
     var ids =
         sql.list(
-            "SELECT m.\"ID\" FROM \"movies\" m" + where + " ORDER BY m.\"ID\" LIMIT ? OFFSET ?",
+            "SELECT m.id FROM movies m" + where + " ORDER BY m.id LIMIT ? OFFSET ?",
             (r, n) -> r.getObject(1, UUID.class),
             args.toArray());
-    activity.audit(user, "SEARCH", "MOVIE", null, "SUCCESS");
-    activity.analytics(user, "search_completed", null);
+    if (user != null) {
+      activity.audit(user, "SEARCH", "MOVIE", null, "SUCCESS");
+      activity.analytics(user, "search_completed", null);
+    }
     return SqlRepository.page(
         ids.stream().map(id -> MovieResponse.from(movies.findById(id).orElseThrow())).toList(),
         page,
@@ -80,16 +82,19 @@ public class CatalogService {
 
   public MovieDetails details(UUID id, UUID user) {
     var m = movies.findById(id).orElseThrow(() -> new MovieNotFoundException(id));
-    var rating =
-        sql.one(
-            "SELECT score FROM personal_rating WHERE user_id=? AND movie_id=?",
-            (r, n) -> r.getInt(1),
-            user,
-            id);
+    Integer rating =
+        user == null
+            ? null
+            : sql.one(
+                "SELECT score FROM personal_rating WHERE user_id=? AND movie_id=?",
+                (r, n) -> r.getInt(1),
+                user,
+                id);
     return new MovieDetails(
         m.id(),
         m.title(),
         m.description(),
+        m.posterUrl(),
         m.director(),
         m.genre(),
         m.releaseDate(),
@@ -218,7 +223,7 @@ public class CatalogService {
       throw new ApiException(
           HttpStatus.BAD_REQUEST, "Rating must be finite and within its source scale.");
     if (sql.one(
-            "SELECT \"ID\" FROM \"movies\" WHERE \"ID\"=? FOR UPDATE",
+            "SELECT id FROM movies WHERE id=? FOR UPDATE",
             (r, n) -> r.getObject(1, UUID.class),
             movie)
         == null) throw new MovieNotFoundException(movie);

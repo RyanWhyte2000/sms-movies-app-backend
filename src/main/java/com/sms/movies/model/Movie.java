@@ -10,6 +10,7 @@ public record Movie(
     @Id UUID id,
     String title,
     String description,
+    String posterUrl,
     String director,
     String genre,
     LocalDate releaseDate,

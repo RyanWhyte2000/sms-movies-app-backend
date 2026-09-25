@@ -36,12 +36,21 @@ public class MovieController {
       description = "Returns a paginated movie catalogue filtered by text, cast, director or genre.")
   public PageResponse<MovieResponse> list(
       @RequestParam(required = false) @jakarta.validation.constraints.Size(max = 200) String q,
+      @RequestParam(required = false) java.util.UUID cast,
+      @RequestParam(required = false) java.util.UUID director,
+      @RequestParam(required = false) java.util.UUID genreId,
       @RequestParam(required = false) java.util.UUID castId,
       @RequestParam(required = false) java.util.UUID directorId,
-      @RequestParam(required = false) java.util.UUID genreId,
       @RequestParam(defaultValue = "0") @Min(0) int page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-    return catalog.search(current.id(), q, castId, directorId, genreId, page, size);
+    return catalog.search(
+        current.idOrNull(),
+        q,
+        cast == null ? castId : cast,
+        director == null ? directorId : director,
+        genreId,
+        page,
+        size);
   }
 
   @GetMapping("/{id}")
@@ -49,7 +58,7 @@ public class MovieController {
       summary = "Get movie details",
       description = "Returns catalogue details, credits, genres, external ratings and personal rating.")
   public com.sms.movies.dto.DiscoveryDtos.MovieDetails get(@PathVariable java.util.UUID id) {
-    return catalog.details(id, current.id());
+    return catalog.details(id, current.idOrNull());
   }
 
   @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")

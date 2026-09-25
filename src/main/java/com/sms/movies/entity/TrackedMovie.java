@@ -11,6 +11,7 @@ public record TrackedMovie(
     @Id UUID id,
     String title,
     String description,
+    @Column("poster_url") String posterUrl,
     String director,
     String genre,
     @Column("release_date") LocalDate releaseDate,

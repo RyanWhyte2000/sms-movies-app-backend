@@ -8,6 +8,7 @@ import com.sms.movies.service.*;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @io.swagger.v3.oas.annotations.tags.Tag(
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
     description = "Create, inspect and revoke share links for owned collections.")
 @RestController
 @RequestMapping("/api/me/collections/{collectionId}/shares")
+@PreAuthorize("hasRole('ADMIN')")
 public class ShareController {
   private final ShareService service;
   private final CurrentUser current;

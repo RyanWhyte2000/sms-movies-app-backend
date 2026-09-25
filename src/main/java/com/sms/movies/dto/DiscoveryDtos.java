@@ -24,6 +24,7 @@ public final class DiscoveryDtos {
       UUID id,
       String title,
       String description,
+      String posterUrl,
       String director,
       String genre,
       java.time.LocalDate releaseDate,

@@ -7,6 +7,7 @@ CREATE TABLE movies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title VARCHAR(200) NOT NULL,
     description VARCHAR(5000),
+    poster_url VARCHAR(2048) CHECK (poster_url IS NULL OR poster_url ~ '^https?://\S+$'),
     director VARCHAR(200) NOT NULL,
     genre VARCHAR(100) NOT NULL,
     release_date DATE NOT NULL,

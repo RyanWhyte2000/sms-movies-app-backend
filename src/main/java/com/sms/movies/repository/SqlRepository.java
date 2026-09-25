@@ -35,7 +35,7 @@ public class SqlRepository {
     var key = new GeneratedKeyHolder();
     jdbc.update(
         connection -> {
-          var statement = connection.prepareStatement(sql, new String[] {"ID"});
+          var statement = connection.prepareStatement(sql, new String[] {"id"});
           for (int i = 0; i < args.length; i++) statement.setObject(i + 1, args[i]);
           return statement;
         },
