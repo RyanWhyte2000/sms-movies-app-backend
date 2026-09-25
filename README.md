@@ -73,7 +73,9 @@ in-memory database. Make the image available to the cluster before installation.
 [`azure-pipelines.yml`](azure-pipelines.yml) builds and tests the API with Java 17,
 validates the Docker image and Helm chart, and publishes build artifacts. See the
 [pipeline setup guide](docs/azure-pipelines.md) to connect it to Azure DevOps.
-Registry publishing, deployment, and coverage enforcement are not configured yet.
+JaCoCo results appear in the pipeline's Code Coverage tab and as a downloadable
+`jacoco-html` artifact. Registry publishing, deployment, and coverage enforcement
+are not configured yet.
 
 ## Database changes
 

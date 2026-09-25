@@ -63,13 +63,27 @@ jobs:
           failTaskOnMissingResultsFile: true
           testRunTitle: Movies API — Java 17
 
+      - bash: |
+          set -euo pipefail
+          test -s target/site/jacoco/jacoco.xml
+          test -s target/site/jacoco/index.html
+          echo "JaCoCo XML: $(pwd)/target/site/jacoco/jacoco.xml"
+          echo "JaCoCo HTML: $(pwd)/target/site/jacoco/index.html"
+        displayName: Verify JaCoCo report was generated
+
       - task: PublishCodeCoverageResults@2
-        displayName: Publish JaCoCo coverage
-        condition: succeededOrFailed()
+        displayName: Publish JaCoCo to Code Coverage tab
         inputs:
-          summaryFileLocation: $(System.DefaultWorkingDirectory)/target/site/jacoco/jacoco.xml
-          pathToSources: $(System.DefaultWorkingDirectory)/src/main/java
+          summaryFileLocation: $(Build.SourcesDirectory)/target/site/jacoco/jacoco.xml
+          pathToSources: $(Build.SourcesDirectory)/src/main/java
           failIfCoverageEmpty: true
+
+      - task: PublishPipelineArtifact@1
+        displayName: Publish browsable JaCoCo HTML report
+        inputs:
+          targetPath: $(Build.SourcesDirectory)/target/site/jacoco
+          artifact: jacoco-html
+          publishLocation: pipeline
 
       - task: HelmInstaller@1
         displayName: Install Helm
