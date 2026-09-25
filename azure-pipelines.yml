@@ -63,6 +63,14 @@ jobs:
           failTaskOnMissingResultsFile: true
           testRunTitle: Movies API — Java 17
 
+      - task: PublishCodeCoverageResults@2
+        displayName: Publish JaCoCo coverage
+        condition: succeededOrFailed()
+        inputs:
+          summaryFileLocation: $(System.DefaultWorkingDirectory)/target/site/jacoco/jacoco.xml
+          pathToSources: $(System.DefaultWorkingDirectory)/src/main/java
+          failIfCoverageEmpty: true
+
       - task: HelmInstaller@1
         displayName: Install Helm
         inputs:
