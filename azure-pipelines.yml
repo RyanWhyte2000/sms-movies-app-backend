@@ -22,7 +22,7 @@ variables:
   helmVersion: '3.17.3'
   azureServiceConnection: 'smsmovies2'
   azureResourceGroup: 'sms-movies'
-  azureLocation: 'WestUS2 '
+  azureLocation: 'westus2'
   containerAppEnvironment: 'smsmovies'
   containerAppName: 'smsmovies'
   acrName: 'smsMovies'
@@ -187,59 +187,99 @@ stages:
           - checkout: none
 
           - task: AzureCLI@2
-            displayName: Resolve immutable ACR image
+            displayName: Configure identity and deploy movies API
             inputs:
               azureSubscription: $(azureServiceConnection)
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
                 set -euo pipefail
+
+                for variable_name in DATABASE_URL DATABASE_USERNAME DATABASE_PASSWORD; do
+                  variable_value="${!variable_name:-}"
+                  if [[ -z "$variable_value" || "$variable_value" == '$('* ]]; then
+                    echo "##vso[task.logissue type=error]Pipeline variable $variable_name is missing."
+                    exit 1
+                  fi
+                done
+                environment_values=(
+                  "DATABASE_URL=$DATABASE_URL"
+                  "DATABASE_USERNAME=$DATABASE_USERNAME"
+                  "DATABASE_PASSWORD=$DATABASE_PASSWORD"
+                )
+                if [[ -n "${APP_CORS_ALLOWED_ORIGINS:-}" && "$APP_CORS_ALLOWED_ORIGINS" != '$('* ]]; then
+                  environment_values+=("APP_CORS_ALLOWED_ORIGINS=$APP_CORS_ALLOWED_ORIGINS")
+                fi
+
                 az acr show \
                   --name "$(acrName)" \
                   --query loginServer \
                   --output tsv \
                   --only-show-errors > "$AGENT_TEMPDIRECTORY/acr-login-server"
+                az acr show \
+                  --name "$(acrName)" \
+                  --query id \
+                  --output tsv \
+                  --only-show-errors > "$AGENT_TEMPDIRECTORY/acr-resource-id"
                 read -r login_server < "$AGENT_TEMPDIRECTORY/acr-login-server"
+                read -r acr_resource_id < "$AGENT_TEMPDIRECTORY/acr-resource-id"
                 image="${login_server}/movies-api:$(Build.BuildId)"
-                echo "##vso[task.setvariable variable=containerImage]$image"
-                echo "Deploying image: $image"
 
-          - task: AzureContainerApps@1
-            displayName: Deploy movies API
-            inputs:
-              azureSubscription: $(azureServiceConnection)
-              acrName: $(acrName)
-              imageToDeploy: $(containerImage)
-              containerAppName: $(containerAppName)
-              resourceGroup: $(azureResourceGroup)
-              containerAppEnvironment: $(containerAppEnvironment)
-              location: $(azureLocation)
-              targetPort: '8080'
-              ingress: external
-              environmentVariables: >-
-                DATABASE_URL=$(DATABASE_URL)
-                DATABASE_USERNAME=$(DATABASE_USERNAME)
-                DATABASE_PASSWORD=$(DATABASE_PASSWORD)
-                APP_CORS_ALLOWED_ORIGINS=$(APP_CORS_ALLOWED_ORIGINS)
+                az containerapp identity assign \
+                  --name "$(containerAppName)" \
+                  --resource-group "$(azureResourceGroup)" \
+                  --system-assigned \
+                  --query principalId \
+                  --output tsv \
+                  --only-show-errors > "$AGENT_TEMPDIRECTORY/container-app-principal-id"
+                read -r principal_id < "$AGENT_TEMPDIRECTORY/container-app-principal-id"
 
-          - task: AzureCLI@2
-            displayName: Apply free-tier scaling limits
-            inputs:
-              azureSubscription: $(azureServiceConnection)
-              scriptType: bash
-              scriptLocation: inlineScript
-              inlineScript: |
-                set -euo pipefail
+                az role assignment list \
+                  --assignee-object-id "$principal_id" \
+                  --scope "$acr_resource_id" \
+                  --role AcrPull \
+                  --query 'length(@)' \
+                  --output tsv \
+                  --only-show-errors > "$AGENT_TEMPDIRECTORY/acr-pull-role-count"
+                read -r role_count < "$AGENT_TEMPDIRECTORY/acr-pull-role-count"
+                if [[ "$role_count" == "0" ]]; then
+                  az role assignment create \
+                    --assignee-object-id "$principal_id" \
+                    --assignee-principal-type ServicePrincipal \
+                    --role AcrPull \
+                    --scope "$acr_resource_id" \
+                    --only-show-errors > /dev/null
+                fi
+
+                az containerapp registry set \
+                  --name "$(containerAppName)" \
+                  --resource-group "$(azureResourceGroup)" \
+                  --server "$login_server" \
+                  --identity system \
+                  --only-show-errors
+                az containerapp ingress enable \
+                  --name "$(containerAppName)" \
+                  --resource-group "$(azureResourceGroup)" \
+                  --type external \
+                  --target-port 8080 \
+                  --only-show-errors
                 az containerapp update \
                   --name "$(containerAppName)" \
                   --resource-group "$(azureResourceGroup)" \
+                  --image "$image" \
                   --cpu 0.5 \
                   --memory 1.0Gi \
                   --min-replicas 0 \
                   --max-replicas 1 \
+                  --set-env-vars "${environment_values[@]}" \
                   --only-show-errors
                 az containerapp show \
                   --name "$(containerAppName)" \
                   --resource-group "$(azureResourceGroup)" \
                   --query "properties.configuration.ingress.fqdn" \
                   --output tsv
+            env:
+              DATABASE_URL: $(DATABASE_URL)
+              DATABASE_USERNAME: $(DATABASE_USERNAME)
+              DATABASE_PASSWORD: $(DATABASE_PASSWORD)
+              APP_CORS_ALLOWED_ORIGINS: $(APP_CORS_ALLOWED_ORIGINS)

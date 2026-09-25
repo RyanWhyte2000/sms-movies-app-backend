@@ -37,7 +37,9 @@ GitHub; Azure Repos uses branch policies instead.
 Create or select these resources before the first image push:
 
 1. An Azure Resource Manager service connection named `smsmovies2` with
-   the `AcrPush` role on the registry.
+   the `AcrPush` role on the registry. To let the pipeline create the app's
+   `AcrPull` assignment, it also needs Owner or User Access Administrator on the
+   registry scope.
 2. An Azure Container Registry matching `acrName` in the pipeline. Registry names
    are globally unique.
 3. A resource group named `sms-movies` and a Consumption-plan Container Apps
