@@ -38,6 +38,10 @@ With the disposable local database, bootstrap runs again after every app restart
 | `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | Datasource configuration. `DATABASE_URL` must be a JDBC URL such as `jdbc:postgresql://host:5432/database?sslmode=require`. |
 | `APP_ADMIN_EMAIL`, `APP_ADMIN_PASSWORD` | Optional initial administrator |
 | `APP_CORS_ALLOWED_ORIGINS` | Comma-separated exact frontend origins; default same-origin |
+| `APP_RATE_LIMIT_ENABLED` | Enable per-client API rate limiting; default `true` |
+| `APP_RATE_LIMIT_REQUESTS` | Requests allowed per window and application instance; default `120` |
+| `APP_RATE_LIMIT_WINDOW` | Window duration, such as `60s` or `5m`; default `60s` |
+| `APP_RATE_LIMIT_MAX_TRACKED_CLIENTS` | Memory-safety cap for tracked client addresses; default `100000` |
 | `SERVER_SERVLET_SESSION_COOKIE_SECURE` | Set true for HTTPS deployments |
 | `SERVER_SERVLET_SESSION_COOKIE_SAME_SITE` | Default lax; assess explicitly for cross-site deployments |
 
@@ -110,6 +114,13 @@ do not provide full semantic understanding. Corpus size is capped at 1000 movies
 Third-party ratings can be imported by an admin and displayed with their source
 and scale, but no external movie-data provider is configured. The detailed API
 guide describes these limitations and response contracts.
+
+Rate limiting is enforced in-process per direct client address for `/api/**`; browser
+preflight requests are excluded. Responses include rate-limit headers and return a
+`429` problem response with `Retry-After` when the limit is exceeded. In a multi-pod
+deployment, configure a shared limiter at the ingress or replace the in-memory store
+with a distributed implementation. Do not trust forwarded client-address headers
+unless the application is behind a correctly configured trusted proxy.
 
 This API implementation does not complete every assessment deliverable. Frontend,
 provider integration, coverage gate/CI deployment, product KPI analysis, consent

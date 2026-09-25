@@ -85,7 +85,14 @@ public class SecurityConfig {
     config.setAllowCredentials(true);
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     config.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN"));
-    config.setExposedHeaders(List.of("X-Correlation-ID", "Location"));
+    config.setExposedHeaders(
+        List.of(
+            "X-Correlation-ID",
+            "Location",
+            "RateLimit-Limit",
+            "RateLimit-Remaining",
+            "RateLimit-Reset",
+            "Retry-After"));
     var source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/api/**", config);
     return source;
