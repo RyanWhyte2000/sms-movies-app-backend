@@ -67,6 +67,13 @@ az role assignment create \
 After that assignment exists, the pipeline configures the app to authenticate to
 ACR with its system identity and deploys without modifying Azure RBAC.
 
+If Azure reports only `Operation expired`, the deployment step prints the latest
+revision state plus Container Apps system and application logs. `ErrImagePull`
+means the one-time `AcrPull` assignment is missing or has not propagated yet.
+`ContainerCrashing` normally means the Spring application could not start; check
+the application-log section for database connectivity, credentials, or Flyway
+errors. Role assignments can take several minutes to propagate.
+
 Add `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, and
 `APP_CORS_ALLOWED_ORIGINS` as Azure DevOps pipeline variables. Mark the three
 database values secret. Do not place their values directly in YAML.

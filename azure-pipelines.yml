@@ -237,16 +237,40 @@ stages:
                   --type external \
                   --target-port 8080 \
                   --only-show-errors
-                az containerapp update \
-                  --name "$(containerAppName)" \
-                  --resource-group "$(azureResourceGroup)" \
-                  --image "$image" \
-                  --cpu 0.5 \
-                  --memory 1.0Gi \
-                  --min-replicas 0 \
-                  --max-replicas 1 \
-                  --set-env-vars "${environment_values[@]}" \
-                  --only-show-errors
+                if ! az containerapp update \
+                    --name "$(containerAppName)" \
+                    --resource-group "$(azureResourceGroup)" \
+                    --image "$image" \
+                    --cpu 0.5 \
+                    --memory 1.0Gi \
+                    --min-replicas 0 \
+                    --max-replicas 1 \
+                    --set-env-vars "${environment_values[@]}" \
+                    --only-show-errors; then
+                  echo "##vso[task.logissue type=error]Container App revision failed to provision. Azure diagnostics follow."
+                  echo "Revision status:"
+                  az containerapp revision list \
+                    --name "$(containerAppName)" \
+                    --resource-group "$(azureResourceGroup)" \
+                    --all \
+                    --query "[].{Name:name,Active:properties.active,Provisioning:properties.provisioningState,Running:properties.runningState,Details:properties.runningStateDetails,Created:properties.createdTime}" \
+                    --output table || true
+                  echo "System logs:"
+                  az containerapp logs show \
+                    --name "$(containerAppName)" \
+                    --resource-group "$(azureResourceGroup)" \
+                    --type system \
+                    --tail 100 \
+                    --format text || true
+                  echo "Application logs (when a replica was created):"
+                  az containerapp logs show \
+                    --name "$(containerAppName)" \
+                    --resource-group "$(azureResourceGroup)" \
+                    --type console \
+                    --tail 100 \
+                    --format text || true
+                  exit 1
+                fi
                 az containerapp show \
                   --name "$(containerAppName)" \
                   --resource-group "$(azureResourceGroup)" \
