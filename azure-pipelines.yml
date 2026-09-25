@@ -22,12 +22,12 @@ variables:
   helmVersion: '3.17.3'
   # Rename these values to match resources in your Azure subscription. The ACR
   # name must be globally unique and must not include ".azurecr.io".
-  azureServiceConnection: 'sms-movies-azure'
-  azureResourceGroup: 'sms-movies-rg'
+  azureServiceConnection: 'smsmovies2'
+  azureResourceGroup: 'sms-movies'
   azureLocation: 'eastus'
   containerAppEnvironment: 'sms-movies-env'
   containerAppName: 'sms-movies-api'
-  acrName: 'smsmoviesacr'
+  acrName: 'smsMovies'
   containerImage: '$(acrName).azurecr.io/movies-api:$(Build.BuildId)'
 
 jobs:
