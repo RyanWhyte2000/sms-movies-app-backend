@@ -7,7 +7,8 @@ import jakarta.validation.constraints.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-@io.swagger.v3.oas.annotations.tags.Tag(name = "Genre")
+@io.swagger.v3.oas.annotations.tags.Tag(
+    name = "Genres", description = "Browse and maintain movie genres.")
 @RestController
 @RequestMapping("/api/genres")
 public class GenreController {
@@ -18,6 +19,9 @@ public class GenreController {
   }
 
   @GetMapping
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "List genres",
+      description = "Returns all genres in the movie catalogue.")
   public java.util.List<NamedItem> list() {
     return catalog.genres();
   }
@@ -25,6 +29,9 @@ public class GenreController {
   public record NameRequest(@NotBlank @Size(max = 100) String name) {}
 
   @PostMapping
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Create a genre",
+      description = "Adds a genre to the catalogue. Requires administrator access.")
   @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
   @PreAuthorize("hasRole('ADMIN')")
   public NamedItem create(@Valid @RequestBody NameRequest request) {

@@ -8,7 +8,8 @@ import com.sms.movies.service.*;
 import jakarta.validation.constraints.*;
 import org.springframework.web.bind.annotation.*;
 
-@io.swagger.v3.oas.annotations.tags.Tag(name = "Audit")
+@io.swagger.v3.oas.annotations.tags.Tag(
+    name = "Audit", description = "Review security and activity events for the current user.")
 @RestController
 @RequestMapping("/api/me/audit-events")
 public class AuditController {
@@ -21,6 +22,9 @@ public class AuditController {
   }
 
   @GetMapping
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "List audit events",
+      description = "Returns the current user's audit events with optional action and time filters.")
   public PageResponse<AuditService.AuditEvent> list(
       @RequestParam(required = false) @Size(max = 80) String action,
       @RequestParam(required = false) java.time.Instant from,

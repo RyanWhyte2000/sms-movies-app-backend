@@ -7,10 +7,15 @@ import com.sms.movies.security.CurrentUser;
 import com.sms.movies.service.*;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@io.swagger.v3.oas.annotations.tags.Tag(name = "Collection")
+@Tag(
+    name = "Collection",
+    description =
+        "Manage the authenticated user's movie collections and the movies contained in them.")
 @RestController
 @RequestMapping("/api/me/collections")
 public class CollectionController {
@@ -23,6 +28,9 @@ public class CollectionController {
   }
 
   @GetMapping
+  @Operation(
+      summary = "List collections",
+      description = "Returns a paginated list of collections owned by the authenticated user.")
   public PageResponse<CollectionResponse> list(
       @RequestParam(defaultValue = "0") @Min(0) int page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
@@ -30,6 +38,9 @@ public class CollectionController {
   }
 
   @PostMapping
+  @Operation(
+      summary = "Create a collection",
+      description = "Creates a named movie collection for the authenticated user.")
   public ResponseEntity<CollectionResponse> create(@Valid @RequestBody NameRequest body) {
     var result = service.create(current.id(), body.name());
     return ResponseEntity.created(java.net.URI.create("/api/me/collections/" + result.id()))
@@ -37,6 +48,9 @@ public class CollectionController {
   }
 
   @GetMapping("/{id}")
+  @Operation(
+      summary = "Get a collection",
+      description = "Returns an owned collection and a paginated list of its movies.")
   public CollectionDetails get(
       @PathVariable @Positive long id,
       @RequestParam(defaultValue = "0") @Min(0) int page,
@@ -45,18 +59,27 @@ public class CollectionController {
   }
 
   @PatchMapping("/{id}")
+  @Operation(
+      summary = "Rename a collection",
+      description = "Changes the name of a collection owned by the authenticated user.")
   public CollectionResponse rename(
       @PathVariable @Positive long id, @Valid @RequestBody NameRequest body) {
     return service.rename(current.id(), id, body.name());
   }
 
   @DeleteMapping("/{id}")
+  @Operation(
+      summary = "Delete a collection",
+      description = "Deletes an owned collection and its membership entries.")
   public ResponseEntity<Void> delete(@PathVariable @Positive long id) {
     service.delete(current.id(), id);
     return ResponseEntity.noContent().build();
   }
 
   @PutMapping("/{id}/movies/{movieId}")
+  @Operation(
+      summary = "Add a movie to a collection",
+      description = "Adds a movie to an owned collection. Repeating the request is idempotent.")
   public ResponseEntity<Void> add(
       @PathVariable @Positive long id, @PathVariable @Positive long movieId) {
     service.add(current.id(), id, movieId);
@@ -64,6 +87,9 @@ public class CollectionController {
   }
 
   @DeleteMapping("/{id}/movies/{movieId}")
+  @Operation(
+      summary = "Remove a movie from a collection",
+      description = "Removes a movie from an owned collection. Repeating the request is idempotent.")
   public ResponseEntity<Void> remove(
       @PathVariable @Positive long id, @PathVariable @Positive long movieId) {
     service.remove(current.id(), id, movieId);

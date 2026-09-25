@@ -8,7 +8,9 @@ import jakarta.validation.constraints.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@io.swagger.v3.oas.annotations.tags.Tag(name = "SharedCollection")
+@io.swagger.v3.oas.annotations.tags.Tag(
+    name = "Shared Collections",
+    description = "Read collections exposed through public share links.")
 @RestController
 @RequestMapping("/api/shared/collections")
 public class SharedCollectionController {
@@ -19,6 +21,9 @@ public class SharedCollectionController {
   }
 
   @GetMapping("/{token}")
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Read a shared collection",
+      description = "Returns a public, read-only view of a valid unexpired shared collection.")
   public ResponseEntity<SharedCollection> read(
       @PathVariable @Size(max = 100) String token,
       @RequestParam(defaultValue = "0") @Min(0) int page,

@@ -12,7 +12,8 @@ import java.net.URI;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@io.swagger.v3.oas.annotations.tags.Tag(name = "Movie")
+@io.swagger.v3.oas.annotations.tags.Tag(
+    name = "Movies", description = "Search, inspect and administer the movie catalogue.")
 @RestController
 @RequestMapping("/api/movies")
 public class MovieController {
@@ -30,6 +31,9 @@ public class MovieController {
   }
 
   @GetMapping
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Search movies",
+      description = "Returns a paginated movie catalogue filtered by text, cast, director or genre.")
   public PageResponse<MovieResponse> list(
       @RequestParam(required = false) @jakarta.validation.constraints.Size(max = 200) String q,
       @RequestParam(required = false) @Positive Long castId,
@@ -41,12 +45,18 @@ public class MovieController {
   }
 
   @GetMapping("/{id}")
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Get movie details",
+      description = "Returns catalogue details, credits, genres, external ratings and personal rating.")
   public com.sms.movies.dto.DiscoveryDtos.MovieDetails get(@PathVariable @Positive long id) {
     return catalog.details(id, current.id());
   }
 
   @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
   @PostMapping
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Create a movie",
+      description = "Adds a movie to the catalogue. Requires administrator access.")
   public ResponseEntity<MovieResponse> create(@Valid @RequestBody MovieRequest request) {
     MovieResponse movie = service.create(request);
     return ResponseEntity.created(URI.create("/api/movies/" + movie.id())).body(movie);
@@ -54,6 +64,9 @@ public class MovieController {
 
   @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
   @PutMapping("/{id}")
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Update a movie",
+      description = "Replaces a movie's catalogue details. Requires administrator access.")
   public MovieResponse update(
       @PathVariable @Positive long id, @Valid @RequestBody MovieRequest request) {
     return service.update(id, request);
@@ -61,6 +74,9 @@ public class MovieController {
 
   @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
   @DeleteMapping("/{id}")
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Delete a movie",
+      description = "Removes a movie from the catalogue. Requires administrator access.")
   public ResponseEntity<Void> delete(@PathVariable @Positive long id) {
     service.delete(id);
     return ResponseEntity.noContent().build();

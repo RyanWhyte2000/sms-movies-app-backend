@@ -8,7 +8,8 @@ import jakarta.validation.constraints.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-@io.swagger.v3.oas.annotations.tags.Tag(name = "Person")
+@io.swagger.v3.oas.annotations.tags.Tag(
+    name = "People", description = "Search and maintain people credited in movies.")
 @RestController
 @RequestMapping("/api/people")
 public class PersonController {
@@ -19,6 +20,9 @@ public class PersonController {
   }
 
   @GetMapping
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Search people",
+      description = "Returns a paginated list of people, optionally filtered by name and credit role.")
   public PageResponse<NamedItem> list(
       @RequestParam(defaultValue = "") @Size(max = 200) String q,
       @RequestParam(required = false) String role,
@@ -30,6 +34,9 @@ public class PersonController {
   public record NameRequest(@NotBlank @Size(max = 200) String name) {}
 
   @PostMapping
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Create a person",
+      description = "Adds a person to the catalogue. Requires administrator access.")
   @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
   @PreAuthorize("hasRole('ADMIN')")
   public NamedItem create(@Valid @RequestBody NameRequest request) {

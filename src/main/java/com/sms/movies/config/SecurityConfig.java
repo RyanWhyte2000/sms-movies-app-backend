@@ -118,9 +118,17 @@ public class SecurityConfig {
       throws java.io.IOException {
     res.setStatus(status);
     res.setContentType("application/problem+json");
+    String title =
+        switch (status) {
+          case 401 -> "Unauthorized";
+          case 403 -> "Forbidden";
+          default -> "Request failed";
+        };
     res.getWriter()
         .write(
-            "{\"status\":"
+            "{\"type\":\"about:blank\",\"title\":\""
+                + title
+                + "\",\"status\":"
                 + status
                 + ",\"detail\":\""
                 + detail

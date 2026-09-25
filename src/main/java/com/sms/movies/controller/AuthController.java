@@ -15,7 +15,8 @@ import org.springframework.security.web.authentication.session.SessionAuthentica
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
-@io.swagger.v3.oas.annotations.tags.Tag(name = "Auth")
+@io.swagger.v3.oas.annotations.tags.Tag(
+    name = "Auth", description = "Register accounts and manage authenticated sessions.")
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -45,11 +46,17 @@ public class AuthController {
   }
 
   @PostMapping("/register")
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Register an account",
+      description = "Creates a user account and its default movie collection.")
   public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest body) {
     return ResponseEntity.status(HttpStatus.CREATED).body(accounts.register(body));
   }
 
   @PostMapping("/login")
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Log in",
+      description = "Authenticates credentials and establishes a server-side session.")
   public UserResponse login(
       @Valid @RequestBody LoginRequest body,
       HttpServletRequest request,
@@ -77,6 +84,9 @@ public class AuthController {
   }
 
   @PostMapping("/logout")
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Log out",
+      description = "Ends the authenticated session and clears its security context.")
   public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
     audit.record(current.id(), "LOGOUT", "USER", current.id(), "SUCCESS");
     new SecurityContextLogoutHandler()

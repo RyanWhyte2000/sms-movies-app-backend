@@ -6,7 +6,9 @@ import com.sms.movies.service.DiscoveryService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
-@io.swagger.v3.oas.annotations.tags.Tag(name = "Recommendation")
+@io.swagger.v3.oas.annotations.tags.Tag(
+    name = "Recommendations",
+    description = "Generate personalized movie recommendations from user context.")
 @RestController
 @RequestMapping("/api/recommendations")
 public class RecommendationController {
@@ -19,6 +21,9 @@ public class RecommendationController {
   }
 
   @PostMapping
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Recommend movies",
+      description = "Returns personalized movie recommendations for the authenticated user.")
   public DiscoveryResponse discover(@Valid @RequestBody RecommendationRequest body) {
     return service.recommendations(current.id(), body.prompt(), body.resultLimit());
   }

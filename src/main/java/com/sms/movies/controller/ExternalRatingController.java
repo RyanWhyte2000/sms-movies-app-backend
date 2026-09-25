@@ -7,7 +7,9 @@ import jakarta.validation.constraints.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-@io.swagger.v3.oas.annotations.tags.Tag(name = "ExternalRating")
+@io.swagger.v3.oas.annotations.tags.Tag(
+    name = "External Ratings",
+    description = "Maintain ratings imported from external providers.")
 @RestController
 @RequestMapping("/api/movies/{movieId}/external-ratings")
 public class ExternalRatingController {
@@ -21,6 +23,9 @@ public class ExternalRatingController {
   }
 
   @PutMapping("/{source}")
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Save an external rating",
+      description = "Creates or updates a provider rating for a movie. Requires administrator access.")
   @PreAuthorize("hasRole('ADMIN')")
   public ExternalRating put(
       @PathVariable @Positive long movieId,

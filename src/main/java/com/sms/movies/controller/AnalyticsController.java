@@ -10,7 +10,8 @@ import jakarta.validation.constraints.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@io.swagger.v3.oas.annotations.tags.Tag(name = "Analytics")
+@io.swagger.v3.oas.annotations.tags.Tag(
+    name = "Analytics", description = "Record consented product analytics events.")
 @RestController
 @RequestMapping("/api/analytics/events")
 public class AnalyticsController {
@@ -23,6 +24,9 @@ public class AnalyticsController {
   }
 
   @PostMapping
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Record an analytics event",
+      description = "Validates and records an analytics event for the authenticated user.")
   public ResponseEntity<Void> accept(
       @Valid @RequestBody com.sms.movies.dto.AnalyticsDtos.EventRequest body) {
     service.accept(current.id(), body);
