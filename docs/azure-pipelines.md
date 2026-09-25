@@ -16,6 +16,9 @@ The root `azure-pipelines.yml` is a CI pipeline for Azure DevOps Services. It:
    stage that builds on the Microsoft-hosted agent and pushes the immutable
    `movies-api:$(Build.BuildId)` image to ACR. It does not use server-side ACR
    Tasks, which can be unavailable on free subscriptions.
+9. Runs `DeployContainerApp` after the image push, deploying that exact immutable
+   tag with external ingress on port 8080. It limits the app to 0.5 vCPU, 1 GiB of
+   memory, zero minimum replicas and one maximum replica.
 
 ## Connect the pipeline
 
@@ -29,7 +32,7 @@ add this pipeline as a **Build validation** policy on each protected target bran
 The YAML `pr` trigger applies to supported external repository providers such as
 GitHub; Azure Repos uses branch policies instead.
 
-## Azure Container Registry setup
+## Azure deployment setup
 
 Create or select these resources before the first image push:
 
@@ -37,12 +40,20 @@ Create or select these resources before the first image push:
    the `AcrPush` role on the registry.
 2. An Azure Container Registry matching `acrName` in the pipeline. Registry names
    are globally unique.
+3. A resource group named `sms-movies` and a Consumption-plan Container Apps
+   environment named `sms-movies-env` in `eastus`.
+4. An Azure DevOps environment named `movies-production`. Configure approvals on
+   this environment if releases should require review.
 
-The image push is intentionally restricted to successful `main` builds and does
-not run for pull-request validation. The pipeline does not deploy the image.
+Add `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, and
+`APP_CORS_ALLOWED_ORIGINS` as Azure DevOps pipeline variables. Mark the three
+database values secret. Do not place their values directly in YAML.
+
+The image push and deployment are restricted to successful `main` builds and do
+not run for pull-request validation.
 
 JaCoCo enforces the repository's 80% line-coverage gate during `mvn verify` before
-the image build-and-push stage can run.
+the image build-and-push and deployment stages can run.
 
 The rendered chart uses the disposable local database profile. It is a validation
 artifact, not a production deployment configuration.

@@ -75,8 +75,8 @@ validates the Docker image and Helm chart, and publishes build artifacts. See th
 [pipeline setup guide](docs/azure-pipelines.md) to connect it to Azure DevOps.
 JaCoCo results appear in the pipeline's Code Coverage tab and as a downloadable
 `jacoco-html` artifact. Successful `main` builds pass the 80% coverage gate and
-push a uniquely tagged image to Azure Container Registry. Deployment is handled
-separately.
+push a uniquely tagged image to Azure Container Registry, then deploy that image
+to Azure Container Apps.
 
 ## Database changes
 
