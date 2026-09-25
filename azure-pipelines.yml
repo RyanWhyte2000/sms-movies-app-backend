@@ -56,8 +56,8 @@ jobs:
         condition: succeededOrFailed()
         inputs:
           testResultsFormat: JUnit
-          testResultsFiles: '**/surefire-reports/TEST-*.xml'
-          searchFolder: $(System.DefaultWorkingDirectory)/target
+          testResultsFiles: '**/target/surefire-reports/TEST-*.xml'
+          searchFolder: $(System.DefaultWorkingDirectory)
           mergeTestResults: true
           failTaskOnFailedTests: true
           failTaskOnMissingResultsFile: true
