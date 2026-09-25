@@ -42,8 +42,6 @@ Create or select these resources before the first image push:
    are globally unique.
 3. A resource group named `sms-movies` and a Consumption-plan Container Apps
    environment named `sms-movies-env` in `eastus`.
-4. An Azure DevOps environment named `movies-production`. Configure approvals on
-   this environment if releases should require review.
 
 Add `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, and
 `APP_CORS_ALLOWED_ORIGINS` as Azure DevOps pipeline variables. Mark the three
