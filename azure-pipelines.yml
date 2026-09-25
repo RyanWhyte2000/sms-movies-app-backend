@@ -1,4 +1,4 @@
-# Azure DevOps Services CI. Registry push and deployment require service connections.
+# Azure DevOps Services CI/CD for Azure Container Apps.
 name: movies-$(Date:yyyyMMdd).$(Rev:r)
 
 trigger:
@@ -20,8 +20,6 @@ pool:
 variables:
   mavenCache: $(Pipeline.Workspace)/.m2/repository
   helmVersion: '3.17.3'
-  # Rename these values to match resources in your Azure subscription. The ACR
-  # name must be globally unique and must not include ".azurecr.io".
   azureServiceConnection: 'smsmovies2'
   azureResourceGroup: 'sms-movies'
   azureLocation: 'eastus'
@@ -30,118 +28,116 @@ variables:
   acrName: 'smsMovies'
   containerImage: '$(acrName).azurecr.io/movies-api:$(Build.BuildId)'
 
-jobs:
-  - job: BuildAndTest
+stages:
+  - stage: BuildAndTest
     displayName: Build, test and package
-    timeoutInMinutes: 30
-    steps:
-      - checkout: self
-        clean: true
+    jobs:
+      - job: Verify
+        timeoutInMinutes: 30
+        steps:
+          - checkout: self
+            clean: true
 
-      - task: JavaToolInstaller@0
-        displayName: Use Java 17
-        inputs:
-          versionSpec: '17'
-          jdkArchitectureOption: x64
-          jdkSourceOption: PreInstalled
+          - task: JavaToolInstaller@0
+            displayName: Use Java 17
+            inputs:
+              versionSpec: '17'
+              jdkArchitectureOption: x64
+              jdkSourceOption: PreInstalled
 
-      - task: Cache@2
-        displayName: Cache Maven dependencies
-        inputs:
-          key: 'maven | "$(Agent.OS)" | pom.xml | .mvn/wrapper/maven-wrapper.properties'
-          restoreKeys: |
-            maven | "$(Agent.OS)"
-          path: $(mavenCache)
+          - task: Cache@2
+            displayName: Cache Maven dependencies
+            inputs:
+              key: 'maven | "$(Agent.OS)" | pom.xml | .mvn/wrapper/maven-wrapper.properties'
+              restoreKeys: |
+                maven | "$(Agent.OS)"
+              path: $(mavenCache)
 
-      - bash: |
-          set -euo pipefail
-          bash ./mvnw -B -ntp "-Dmaven.repo.local=$MAVEN_CACHE" clean verify
-        displayName: Compile, test and package with Maven wrapper
-        env:
-          MAVEN_CACHE: $(mavenCache)
+          - bash: |
+              set -euo pipefail
+              bash ./mvnw -B -ntp "-Dmaven.repo.local=$MAVEN_CACHE" clean verify
+            displayName: Compile, test and package with Maven wrapper
+            env:
+              MAVEN_CACHE: $(mavenCache)
 
-      - task: PublishTestResults@2
-        displayName: Publish JUnit results
-        condition: succeededOrFailed()
-        inputs:
-          testResultsFormat: JUnit
-          testResultsFiles: '**/target/surefire-reports/TEST-*.xml'
-          searchFolder: $(System.DefaultWorkingDirectory)
-          mergeTestResults: true
-          failTaskOnFailedTests: true
-          failTaskOnMissingResultsFile: true
-          testRunTitle: Movies API — Java 17
+          - task: PublishTestResults@2
+            displayName: Publish JUnit results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: '**/target/surefire-reports/TEST-*.xml'
+              searchFolder: $(System.DefaultWorkingDirectory)
+              mergeTestResults: true
+              failTaskOnFailedTests: true
+              failTaskOnMissingResultsFile: true
+              testRunTitle: Movies API - Java 17
 
-      - bash: |
-          set -euo pipefail
-          test -s target/site/jacoco/jacoco.xml
-          test -s target/site/jacoco/index.html
-          echo "JaCoCo XML: $(pwd)/target/site/jacoco/jacoco.xml"
-          echo "JaCoCo HTML: $(pwd)/target/site/jacoco/index.html"
-        displayName: Verify JaCoCo report was generated
+          - bash: |
+              set -euo pipefail
+              test -s target/site/jacoco/jacoco.xml
+              test -s target/site/jacoco/index.html
+            displayName: Verify JaCoCo report was generated
 
-      - task: PublishCodeCoverageResults@2
-        displayName: Publish JaCoCo to Code Coverage tab
-        inputs:
-          summaryFileLocation: $(Build.SourcesDirectory)/target/site/jacoco/jacoco.xml
-          pathToSources: $(Build.SourcesDirectory)/src/main/java
-          failIfCoverageEmpty: true
+          - task: PublishCodeCoverageResults@2
+            displayName: Publish JaCoCo to Code Coverage tab
+            inputs:
+              summaryFileLocation: $(Build.SourcesDirectory)/target/site/jacoco/jacoco.xml
+              pathToSources: $(Build.SourcesDirectory)/src/main/java
+              failIfCoverageEmpty: true
 
-      - task: PublishPipelineArtifact@1
-        displayName: Publish browsable JaCoCo HTML report
-        inputs:
-          targetPath: $(Build.SourcesDirectory)/target/site/jacoco
-          artifact: jacoco-html
-          publishLocation: pipeline
+          - task: PublishPipelineArtifact@1
+            displayName: Publish browsable JaCoCo HTML report
+            inputs:
+              targetPath: $(Build.SourcesDirectory)/target/site/jacoco
+              artifact: jacoco-html
+              publishLocation: pipeline
 
-      - task: HelmInstaller@1
-        displayName: Install Helm
-        inputs:
-          helmVersionToInstall: $(helmVersion)
+          - task: HelmInstaller@1
+            displayName: Install Helm
+            inputs:
+              helmVersionToInstall: $(helmVersion)
 
-      - bash: |
-          set -euo pipefail
-          mkdir -p "$ARTIFACT_DIR/helm"
-          helm lint ./helm/movies --strict
-          helm template movies ./helm/movies > "$ARTIFACT_DIR/helm/rendered-local.yaml"
-          helm package ./helm/movies --destination "$ARTIFACT_DIR/helm"
-        displayName: Validate and package Helm chart
-        env:
-          ARTIFACT_DIR: $(Build.ArtifactStagingDirectory)
+          - bash: |
+              set -euo pipefail
+              mkdir -p "$ARTIFACT_DIR/helm"
+              helm lint ./helm/movies --strict
+              helm template movies ./helm/movies > "$ARTIFACT_DIR/helm/rendered-local.yaml"
+              helm package ./helm/movies --destination "$ARTIFACT_DIR/helm"
+            displayName: Validate and package Helm chart
+            env:
+              ARTIFACT_DIR: $(Build.ArtifactStagingDirectory)
 
-      # Build only: no registry credentials or cloud resources are required.
-      # The Dockerfile also runs tests to validate its Java 17 build environment.
-      - task: Docker@2
-        displayName: Validate Docker image build
-        inputs:
-          command: build
-          repository: movies-api
-          Dockerfile: $(Build.SourcesDirectory)/Dockerfile
-          buildContext: $(Build.SourcesDirectory)
-          tags: |
-            $(Build.BuildId)
+          - task: Docker@2
+            displayName: Validate Docker image build
+            inputs:
+              command: build
+              repository: movies-api
+              Dockerfile: $(Build.SourcesDirectory)/Dockerfile
+              buildContext: $(Build.SourcesDirectory)
+              tags: |
+                $(Build.BuildId)
 
-      - bash: |
-          set -euo pipefail
-          mkdir -p "$ARTIFACT_DIR/app" "$ARTIFACT_DIR/docs"
-          cp target/movies-*.jar "$ARTIFACT_DIR/app/"
-          cp README.md "$ARTIFACT_DIR/"
-          cp azure-pipelines.yml "$ARTIFACT_DIR/"
-          cp -R docs/. "$ARTIFACT_DIR/docs/"
-          cp -R helm/movies "$ARTIFACT_DIR/helm/"
-        displayName: Stage application and documentation
-        env:
-          ARTIFACT_DIR: $(Build.ArtifactStagingDirectory)
+          - bash: |
+              set -euo pipefail
+              mkdir -p "$ARTIFACT_DIR/app" "$ARTIFACT_DIR/docs"
+              cp target/movies-*.jar "$ARTIFACT_DIR/app/"
+              cp README.md "$ARTIFACT_DIR/"
+              cp azure-pipelines.yml "$ARTIFACT_DIR/"
+              cp -R docs/. "$ARTIFACT_DIR/docs/"
+              cp -R helm/movies "$ARTIFACT_DIR/helm/"
+            displayName: Stage application and documentation
+            env:
+              ARTIFACT_DIR: $(Build.ArtifactStagingDirectory)
 
-      - task: PublishPipelineArtifact@1
-        displayName: Publish application and Helm artifacts
-        inputs:
-          targetPath: $(Build.ArtifactStagingDirectory)
-          artifact: movies-build
-          publishLocation: pipeline
+          - task: PublishPipelineArtifact@1
+            displayName: Publish application and Helm artifacts
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)
+              artifact: movies-build
+              publishLocation: pipeline
 
-  - deployment: DeployContainerApp
-    displayName: Push image and deploy Azure Container App
+  - stage: BuildAndPushImage
+    displayName: Build and push image to ACR
     dependsOn: BuildAndTest
     condition: >-
       and(
@@ -149,54 +145,82 @@ jobs:
         eq(variables['Build.SourceBranch'], 'refs/heads/main'),
         ne(variables['Build.Reason'], 'PullRequest')
       )
-    timeoutInMinutes: 30
-    environment: movies-production
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-            - checkout: self
-              clean: true
+    jobs:
+      - job: PushImage
+        displayName: Build and push immutable image
+        timeoutInMinutes: 30
+        steps:
+          - checkout: self
+            clean: true
 
-            - task: AzureContainerApps@1
-              displayName: Build, push and deploy movies API
-              inputs:
-                azureSubscription: $(azureServiceConnection)
-                appSourcePath: $(Build.SourcesDirectory)
-                dockerfilePath: $(Build.SourcesDirectory)/Dockerfile
-                acrName: $(acrName)
-                imageToBuild: $(containerImage)
-                containerAppName: $(containerAppName)
-                resourceGroup: $(azureResourceGroup)
-                containerAppEnvironment: $(containerAppEnvironment)
-                location: $(azureLocation)
-                targetPort: '8080'
-                ingress: external
-                environmentVariables: >-
-                  DATABASE_URL=$(DATABASE_URL)
-                  DATABASE_USERNAME=$(DATABASE_USERNAME)
-                  DATABASE_PASSWORD=$(DATABASE_PASSWORD)
-                  APP_CORS_ALLOWED_ORIGINS=$(APP_CORS_ALLOWED_ORIGINS)
+          - task: AzureCLI@2
+            displayName: Build and push image with ACR Tasks
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                az acr build \
+                  --registry "$(acrName)" \
+                  --image "movies-api:$(Build.BuildId)" \
+                  --file "$(Build.SourcesDirectory)/Dockerfile" \
+                  "$(Build.SourcesDirectory)" \
+                  --only-show-errors
 
-            - task: AzureCLI@2
-              displayName: Apply free-tier scaling limits
-              inputs:
-                azureSubscription: $(azureServiceConnection)
-                scriptType: bash
-                scriptLocation: inlineScript
-                inlineScript: |
-                  set -euo pipefail
-                  az containerapp update \
-                    --name "$(containerAppName)" \
-                    --resource-group "$(azureResourceGroup)" \
-                    --cpu 0.5 \
-                    --memory 1.0Gi \
-                    --min-replicas 0 \
-                    --max-replicas 1 \
-                    --only-show-errors
-                  fqdn="$(az containerapp show \
-                    --name "$(containerAppName)" \
-                    --resource-group "$(azureResourceGroup)" \
-                    --query properties.configuration.ingress.fqdn \
-                    --output tsv)"
-                  echo "Container App URL: https://${fqdn}"
+  - stage: DeployContainerApp
+    displayName: Deploy Azure Container App
+    dependsOn: BuildAndPushImage
+    condition: succeeded()
+    jobs:
+      - deployment: Deploy
+        displayName: Deploy immutable ACR image
+        timeoutInMinutes: 30
+        environment: movies-production
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  clean: true
+
+                - task: AzureContainerApps@1
+                  displayName: Deploy movies API
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    acrName: $(acrName)
+                    imageToDeploy: $(containerImage)
+                    containerAppName: $(containerAppName)
+                    resourceGroup: $(azureResourceGroup)
+                    containerAppEnvironment: $(containerAppEnvironment)
+                    location: $(azureLocation)
+                    targetPort: '8080'
+                    ingress: external
+                    environmentVariables: >-
+                      DATABASE_URL=$(DATABASE_URL)
+                      DATABASE_USERNAME=$(DATABASE_USERNAME)
+                      DATABASE_PASSWORD=$(DATABASE_PASSWORD)
+                      APP_CORS_ALLOWED_ORIGINS=$(APP_CORS_ALLOWED_ORIGINS)
+
+                - task: AzureCLI@2
+                  displayName: Apply free-tier scaling limits
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      az containerapp update \
+                        --name "$(containerAppName)" \
+                        --resource-group "$(azureResourceGroup)" \
+                        --cpu 0.5 \
+                        --memory 1.0Gi \
+                        --min-replicas 0 \
+                        --max-replicas 1 \
+                        --only-show-errors
+                      fqdn="$(az containerapp show \
+                        --name "$(containerAppName)" \
+                        --resource-group "$(azureResourceGroup)" \
+                        --query properties.configuration.ingress.fqdn \
+                        --output tsv)"
+                      echo "Container App URL: https://${fqdn}"

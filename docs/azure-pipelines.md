@@ -12,8 +12,11 @@ The root `azure-pipelines.yml` is a CI pipeline for Azure DevOps Services. It:
    tests as well.
 7. Publishes the executable JAR, packaged chart, rendered local manifests and API
    documentation as the `movies-build` pipeline artifact, only after success.
-8. On successful non-PR builds of `main`, builds and pushes a uniquely tagged image
-   to Azure Container Registry and deploys it to Azure Container Apps.
+8. On successful non-PR builds of `main`, runs a dedicated `BuildAndPushImage`
+   stage that uses ACR Tasks to build and push the immutable
+   `movies-api:$(Build.BuildId)` image.
+9. Runs `DeployContainerApp` only after that push succeeds, deploying the exact
+   immutable ACR image without rebuilding it.
 
 ## Connect the pipeline
 
