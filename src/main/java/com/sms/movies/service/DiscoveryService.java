@@ -13,56 +13,53 @@ import org.springframework.transaction.annotation.Transactional;
 public class DiscoveryService {
   private final MovieRepository movies;
   private final SqlRepository sql;
-  private final ContentRecommendationEngine engine;
-  private final AuditService audit;
-  private final AnalyticsService analytics;
+  private final RecommendationEngine engine;
+  private final ActivityReporter activity;
 
   public DiscoveryService(
       MovieRepository movies,
       SqlRepository sql,
-      ContentRecommendationEngine engine,
-      AuditService audit,
-      AnalyticsService analytics) {
+      RecommendationEngine engine,
+      ActivityReporter activity) {
     this.movies = movies;
     this.sql = sql;
     this.engine = engine;
-    this.audit = audit;
-    this.analytics = analytics;
+    this.activity = activity;
   }
 
   @Transactional
-  public DiscoveryResponse search(long user, String query, int limit) {
+  public DiscoveryResponse search(UUID user, String query, int limit) {
     return discover(user, query, limit, false);
   }
 
   @Transactional
-  public DiscoveryResponse recommendations(long user, String prompt, int limit) {
+  public DiscoveryResponse recommendations(UUID user, String prompt, int limit) {
     return discover(user, prompt, limit, true);
   }
 
-  private DiscoveryResponse discover(long user, String prompt, int limit, boolean personalized) {
+  private DiscoveryResponse discover(UUID user, String prompt, int limit, boolean personalized) {
     long start = System.nanoTime();
     var catalogue =
         movies.findAll(PageRequest.of(0, 1000, Sort.by(Sort.Direction.DESC, "id"))).getContent();
     var documents =
         catalogue.stream()
-            .map(m -> new ContentRecommendationEngine.Document(m.id(), text(m)))
+            .map(m -> new RecommendationEngine.Document(m.id(), text(m)))
             .toList();
-    Set<Long> excluded = new HashSet<>();
+    Set<UUID> excluded = new HashSet<>();
     String query = prompt == null ? "" : prompt;
     if (personalized) {
       excluded.addAll(
           sql.list(
               "SELECT i.movie_id FROM collection_item i JOIN user_collection c ON"
                   + " c.id=i.collection_id WHERE c.user_id=?",
-              (r, n) -> r.getLong(1),
+              (r, n) -> r.getObject(1, UUID.class),
               user));
       var rated =
           sql.list(
               "SELECT movie_id,score FROM personal_rating WHERE user_id=?",
-              (r, n) -> Map.entry(r.getLong(1), r.getInt(2)),
+              (r, n) -> Map.entry(r.getObject(1, UUID.class), r.getInt(2)),
               user);
-      var disliked = new HashSet<Long>();
+      var disliked = new HashSet<UUID>();
       for (var rating : rated) if (rating.getValue() < 4) disliked.add(rating.getKey());
       var preferred = new HashSet<>(excluded);
       preferred.removeAll(disliked);
@@ -91,7 +88,7 @@ public class DiscoveryService {
                           "Recent catalogue entry; no confident content match."))
               .toList();
     else {
-      var index = new HashMap<Long, Movie>();
+      var index = new HashMap<UUID, Movie>();
       for (var m : catalogue) index.put(m.id(), m);
       results =
           matches.stream()
@@ -107,21 +104,22 @@ public class DiscoveryService {
               .toList();
     }
     String type = personalized ? "RECOMMENDATION" : "NATURAL_LANGUAGE_SEARCH";
-    audit.record(user, type, "DISCOVERY", null, "SUCCESS");
-    analytics.record(user, personalized ? "recommendation_completed" : "search_completed", null);
+    activity.audit(user, type, "DISCOVERY", null, "SUCCESS");
+    activity.analytics(
+        user, personalized ? "recommendation_completed" : "search_completed", null);
     sql.update(
         "INSERT INTO"
             + " ai_request(user_id,request_type,engine,fallback_used,result_count,latency_ms,correlation_id)"
             + " VALUES(?,?,?,?,?,?,?)",
         user,
         type,
-        "local-tfidf-v1",
+        engine.name(),
         fallback,
         results.size(),
         (System.nanoTime() - start) / 1_000_000,
-        AuditService.correlationId());
+        activity.correlationId());
     return new DiscoveryResponse(
-        "local-tfidf-v1",
+        engine.name(),
         fallback,
         fallback
             ? "No confident match or insufficient history; returning recent unseen catalogue"

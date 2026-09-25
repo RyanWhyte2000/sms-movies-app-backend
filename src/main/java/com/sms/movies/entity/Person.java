@@ -4,5 +4,5 @@ import java.util.UUID;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Table;
 
-@Table("people")
+@Table("person")
 public record Person(@Id UUID id, String name) {}

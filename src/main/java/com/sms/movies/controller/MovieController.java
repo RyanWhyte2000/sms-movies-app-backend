@@ -36,9 +36,9 @@ public class MovieController {
       description = "Returns a paginated movie catalogue filtered by text, cast, director or genre.")
   public PageResponse<MovieResponse> list(
       @RequestParam(required = false) @jakarta.validation.constraints.Size(max = 200) String q,
-      @RequestParam(required = false) @Positive Long castId,
-      @RequestParam(required = false) @Positive Long directorId,
-      @RequestParam(required = false) @Positive Long genreId,
+      @RequestParam(required = false) java.util.UUID castId,
+      @RequestParam(required = false) java.util.UUID directorId,
+      @RequestParam(required = false) java.util.UUID genreId,
       @RequestParam(defaultValue = "0") @Min(0) int page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
     return catalog.search(current.id(), q, castId, directorId, genreId, page, size);
@@ -48,7 +48,7 @@ public class MovieController {
   @io.swagger.v3.oas.annotations.Operation(
       summary = "Get movie details",
       description = "Returns catalogue details, credits, genres, external ratings and personal rating.")
-  public com.sms.movies.dto.DiscoveryDtos.MovieDetails get(@PathVariable @Positive long id) {
+  public com.sms.movies.dto.DiscoveryDtos.MovieDetails get(@PathVariable java.util.UUID id) {
     return catalog.details(id, current.id());
   }
 
@@ -68,7 +68,7 @@ public class MovieController {
       summary = "Update a movie",
       description = "Replaces a movie's catalogue details. Requires administrator access.")
   public MovieResponse update(
-      @PathVariable @Positive long id, @Valid @RequestBody MovieRequest request) {
+      @PathVariable java.util.UUID id, @Valid @RequestBody MovieRequest request) {
     return service.update(id, request);
   }
 
@@ -77,7 +77,7 @@ public class MovieController {
   @io.swagger.v3.oas.annotations.Operation(
       summary = "Delete a movie",
       description = "Removes a movie from the catalogue. Requires administrator access.")
-  public ResponseEntity<Void> delete(@PathVariable @Positive long id) {
+  public ResponseEntity<Void> delete(@PathVariable java.util.UUID id) {
     service.delete(id);
     return ResponseEntity.noContent().build();
   }

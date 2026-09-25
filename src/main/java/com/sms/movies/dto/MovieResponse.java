@@ -2,9 +2,10 @@ package com.sms.movies.dto;
 
 import com.sms.movies.model.Movie;
 import java.time.LocalDate;
+import java.util.UUID;
 
 public record MovieResponse(
-    Long id,
+    UUID id,
     String title,
     String description,
     String director,

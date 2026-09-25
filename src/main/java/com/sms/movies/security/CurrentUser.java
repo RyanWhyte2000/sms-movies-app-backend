@@ -22,7 +22,7 @@ public class CurrentUser {
     return account.user();
   }
 
-  public long id() {
+  public java.util.UUID id() {
     return get().id();
   }
 }

@@ -35,7 +35,7 @@ With the disposable local database, bootstrap runs again after every app restart
 | Variable | Purpose |
 | --- | --- |
 | `SPRING_PROFILES_ACTIVE` | `local` for the disposable development database |
-| `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` | Datasource configuration |
+| `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | Datasource configuration. `DATABASE_URL` must be a JDBC URL such as `jdbc:postgresql://host:5432/database?sslmode=require`. |
 | `APP_ADMIN_EMAIL`, `APP_ADMIN_PASSWORD` | Optional initial administrator |
 | `APP_CORS_ALLOWED_ORIGINS` | Comma-separated exact frontend origins; default same-origin |
 | `SERVER_SERVLET_SESSION_COOKIE_SECURE` | Set true for HTTPS deployments |

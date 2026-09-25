@@ -4,6 +4,9 @@ All paths are relative to the backend origin. JSON request/response bodies use
 camelCase. OpenAPI is available at `/v3/api-docs` and Swagger UI at
 `/swagger-ui/index.html`, grouped by controller category.
 
+All resource identifiers are UUID strings. Clients must treat identifiers as opaque
+values and must not parse, increment or derive meaning from them.
+
 ## Authentication and browser setup
 
 The API uses server-side JDBC sessions, HttpOnly cookies and CSRF protection. HTTP
@@ -32,7 +35,7 @@ Do not store passwords or session identifiers in localStorage.
 | POST | `/api/auth/register` | `{email, password, displayName}` → 201 user |
 | POST | `/api/auth/login` | `{email, password}` → 200 user + session cookie |
 | POST | `/api/auth/logout` | No body → 204 |
-| GET | `/api/me` | `{id, email, displayName, createdAt}` |
+| GET | `/api/me` | `{id: <UUID>, email, displayName, createdAt}` |
 
 Passwords must have 12–128 characters at registration. Emails are normalized to
 lowercase. Registration creates a default `My movies` collection. Duplicate emails
@@ -50,7 +53,7 @@ responses never contain password hashes. Login failures use a generic 401 messag
 
 Filters combine with AND. Text search matches title, description, people and genre
 names case-insensitively. SQL wildcard characters are treated as literal text.
-Movie list fields are `id`, `title`, `description`, `director`, `genre`,
+Movie list fields are `id` (UUID), `title`, `description`, `director`, `genre`,
 `releaseDate`, and `durationMinutes`. Details add relationship arrays and the
 signed-in user's rating (null when unrated). External ratings include `source`,
 `score`, `scaleMax`, `voteCount`, and `fetchedAt`.
@@ -148,7 +151,7 @@ are not visible through a user's activity view.
 {
   "eventId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
   "eventName": "RECOMMENDATION_SELECTED",
-  "movieId": 1,
+  "movieId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
   "journeyId": "11111111-2222-4333-8444-555555555555",
   "consentGranted": true
 }
@@ -204,6 +207,49 @@ Lists use `{content, page, size, totalElements, totalPages}`. Pages start at 0 a
 size is 1–100. Invalid body/query values return 400; body field errors have an
 `errors` map. Other errors use Problem Detail JSON: 401 for missing/invalid login,
 403 for forbidden operations/CSRF failures, 404 for missing or inaccessible
-resources, 409 for integrity conflicts. Every request returns `X-Correlation-ID`.
+resources, 409 for integrity conflicts and 500 for unexpected server failures.
+Swagger lists only the failure statuses applicable to each operation. Every request
+returns `X-Correlation-ID`.
 Do not expose SQL or stack traces to users. POST create calls may create more than
 one resource if retried; use PUT for collection membership and personal ratings.
+
+| Status | Documented when |
+| --- | --- |
+| 400 | The operation accepts validated input, pagination, filters or UUID parameters |
+| 401 | The operation requires a session, or login credentials are invalid |
+| 403 | The operation is CSRF-protected or requires ADMIN authority |
+| 404 | The operation addresses a movie, collection, share or other owned resource |
+| 409 | Registration, analytics deduplication or a uniqueness constraint can conflict |
+| 500 | Any operation encounters an unexpected server failure |
+
+Standard problem response:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "Resource was not found.",
+  "instance": "/api/movies/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+  "correlationId": "11111111-2222-4333-8444-555555555555"
+}
+```
+
+Validation failures use the same shape and may additionally contain an `errors`
+map whose keys are request fields and whose values are safe validation messages:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Request validation failed.",
+  "instance": "/api/me/ratings/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+  "correlationId": "11111111-2222-4333-8444-555555555555",
+  "errors": {
+    "score": "must be less than or equal to 5"
+  }
+}
+```
+
+The `errors` property is optional and is omitted for non-validation failures.

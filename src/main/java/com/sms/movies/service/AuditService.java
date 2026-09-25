@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuditService {
   public record AuditEvent(
-      long id,
+      UUID id,
       String action,
       String resourceType,
       String resourceId,
@@ -30,7 +30,7 @@ public class AuditService {
         .orElseGet(() -> UUID.randomUUID().toString());
   }
 
-  public void record(Long user, String action, String type, Object resource, String outcome) {
+  public void record(UUID user, String action, String type, Object resource, String outcome) {
     sql.update(
         "INSERT INTO"
             + " audit_event(actor_user_id,action,resource_type,resource_id,outcome,correlation_id)"
@@ -45,7 +45,7 @@ public class AuditService {
 
   @Transactional(readOnly = true)
   public PageResponse<AuditEvent> list(
-      long user, String action, Instant from, Instant to, int page, int size) {
+      UUID user, String action, Instant from, Instant to, int page, int size) {
     var args = new ArrayList<Object>();
     args.add(user);
     String where = " WHERE actor_user_id=?";
@@ -69,7 +69,7 @@ public class AuditService {
             "SELECT * FROM audit_event" + where + " ORDER BY id DESC LIMIT ? OFFSET ?",
             (r, n) ->
                 new AuditEvent(
-                    r.getLong("id"),
+                    r.getObject("id", UUID.class),
                     r.getString("action"),
                     r.getString("resource_type"),
                     r.getString("resource_id"),

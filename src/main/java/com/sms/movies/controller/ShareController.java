@@ -29,7 +29,7 @@ public class ShareController {
       summary = "Create a share link",
       description = "Creates a public share link for an owned collection, optionally with an expiry.")
   public ResponseEntity<CreatedShare> create(
-      @PathVariable @Positive long collectionId,
+      @PathVariable java.util.UUID collectionId,
       @Valid @RequestBody(required = false) ShareRequest body) {
     var result = service.create(current.id(), collectionId, body == null ? null : body.expiresAt());
     return ResponseEntity.created(java.net.URI.create(result.path())).body(result);
@@ -39,7 +39,7 @@ public class ShareController {
   @io.swagger.v3.oas.annotations.Operation(
       summary = "List collection shares",
       description = "Returns active share-link metadata for an owned collection without tokens.")
-  public java.util.List<ShareResponse> list(@PathVariable @Positive long collectionId) {
+  public java.util.List<ShareResponse> list(@PathVariable java.util.UUID collectionId) {
     return service.list(current.id(), collectionId);
   }
 
@@ -48,7 +48,7 @@ public class ShareController {
       summary = "Revoke a share link",
       description = "Revokes an active share link belonging to an owned collection.")
   public ResponseEntity<Void> revoke(
-      @PathVariable @Positive long collectionId, @PathVariable @Positive long shareId) {
+      @PathVariable java.util.UUID collectionId, @PathVariable java.util.UUID shareId) {
     service.revoke(current.id(), collectionId, shareId);
     return ResponseEntity.noContent().build();
   }

@@ -3,13 +3,14 @@ package com.sms.movies.dto;
 import jakarta.validation.constraints.*;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 public final class DiscoveryDtos {
   private DiscoveryDtos() {}
 
-  public record NamedItem(long id, String name) {}
+  public record NamedItem(UUID id, String name) {}
 
-  public record Credit(long personId, String name, String role) {}
+  public record Credit(UUID personId, String name, String role) {}
 
   public record ExternalRating(
       String source, double score, double scaleMax, Long voteCount, Instant fetchedAt) {}
@@ -20,7 +21,7 @@ public final class DiscoveryDtos {
       @PositiveOrZero Long voteCount) {}
 
   public record MovieDetails(
-      long id,
+      UUID id,
       String title,
       String description,
       String director,

@@ -6,6 +6,7 @@ import com.sms.movies.dto.PageResponse;
 import com.sms.movies.exception.MovieNotFoundException;
 import com.sms.movies.model.Movie;
 import com.sms.movies.repository.MovieRepository;
+import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -28,7 +29,7 @@ public class MovieService {
         repository.findAll(PageRequest.of(page, size, Sort.by("id"))).map(MovieResponse::from));
   }
 
-  public MovieResponse get(long id) {
+  public MovieResponse get(UUID id) {
     return MovieResponse.from(find(id));
   }
 
@@ -40,7 +41,7 @@ public class MovieService {
   }
 
   @Transactional
-  public MovieResponse update(long id, MovieRequest request) {
+  public MovieResponse update(UUID id, MovieRequest request) {
     find(id);
     var saved = repository.save(toMovie(id, request));
     catalog.sync(id, request);
@@ -48,15 +49,15 @@ public class MovieService {
   }
 
   @Transactional
-  public void delete(long id) {
+  public void delete(UUID id) {
     repository.delete(find(id));
   }
 
-  private Movie find(long id) {
+  private Movie find(UUID id) {
     return repository.findById(id).orElseThrow(() -> new MovieNotFoundException(id));
   }
 
-  private Movie toMovie(Long id, MovieRequest request) {
+  private Movie toMovie(UUID id, MovieRequest request) {
     return new Movie(
         id,
         request.title().strip(),

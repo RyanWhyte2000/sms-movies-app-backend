@@ -1,14 +1,11 @@
 package com.sms.movies.entity;
 
 import java.time.Instant;
-import java.util.UUID;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Embedded;
 import org.springframework.data.relational.core.mapping.Table;
 
-@Table("collection_items")
+@Table("collection_item")
 public record CollectionItem(
-    @Id UUID id,
-    @Column("user_id") UUID userId,
-    @Column("movie_id") UUID movieId,
-    @Column("added_at") Instant addedAt) {}
+    @Id @Embedded.Nullable CollectionItemId id, @Column("added_at") Instant addedAt) {}

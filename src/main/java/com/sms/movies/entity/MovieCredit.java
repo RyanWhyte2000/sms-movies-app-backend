@@ -4,5 +4,5 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Embedded;
 import org.springframework.data.relational.core.mapping.Table;
 
-@Table("movie_credits")
+@Table("movie_credit")
 public record MovieCredit(@Id @Embedded.Nullable MovieCreditId id) {}

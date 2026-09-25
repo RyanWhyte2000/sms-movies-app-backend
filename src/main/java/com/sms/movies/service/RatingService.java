@@ -3,6 +3,7 @@ package com.sms.movies.service;
 import com.sms.movies.dto.*;
 import com.sms.movies.dto.RatingDtos.*;
 import com.sms.movies.repository.*;
+import java.util.UUID;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,30 +14,27 @@ public class RatingService {
   private static final RowMapper<RatingResponse> MAPPER =
       (r, n) ->
           new RatingResponse(
-              r.getLong("movie_id"),
+              r.getObject("movie_id", UUID.class),
               r.getInt("score"),
               r.getTimestamp("created_at").toInstant(),
               r.getTimestamp("updated_at").toInstant());
   private final SqlRepository sql;
   private final UserRepository users;
   private final MovieService movies;
-  private final AuditService audit;
-  private final AnalyticsService analytics;
+  private final ActivityReporter activity;
 
   public RatingService(
       SqlRepository sql,
       UserRepository users,
       MovieService movies,
-      AuditService audit,
-      AnalyticsService analytics) {
+      ActivityReporter activity) {
     this.sql = sql;
     this.users = users;
     this.movies = movies;
-    this.audit = audit;
-    this.analytics = analytics;
+    this.activity = activity;
   }
 
-  public RatingResponse put(long user, long movie, int score) {
+  public RatingResponse put(UUID user, UUID movie, int score) {
     users.lock(user);
     movies.get(movie);
     var existing =
@@ -53,22 +51,22 @@ public class RatingService {
           score,
           user,
           movie);
-    audit.record(user, "RATING_SAVED", "MOVIE", movie, "SUCCESS");
-    analytics.record(user, "rating_saved", movie);
+    activity.audit(user, "RATING_SAVED", "MOVIE", movie, "SUCCESS");
+    activity.analytics(user, "rating_saved", movie);
     return sql.one(
         "SELECT * FROM personal_rating WHERE user_id=? AND movie_id=?", MAPPER, user, movie);
   }
 
-  public void delete(long user, long movie) {
+  public void delete(UUID user, UUID movie) {
     users.lock(user);
     if (sql.update("DELETE FROM personal_rating WHERE user_id=? AND movie_id=?", user, movie) > 0) {
-      audit.record(user, "RATING_REMOVED", "MOVIE", movie, "SUCCESS");
-      analytics.record(user, "rating_removed", movie);
+      activity.audit(user, "RATING_REMOVED", "MOVIE", movie, "SUCCESS");
+      activity.analytics(user, "rating_removed", movie);
     }
   }
 
   @Transactional(readOnly = true)
-  public PageResponse<RatingResponse> list(long user, int page, int size) {
+  public PageResponse<RatingResponse> list(UUID user, int page, int size) {
     return SqlRepository.page(
         sql.list(
             "SELECT * FROM personal_rating WHERE user_id=? ORDER BY movie_id LIMIT ? OFFSET ?",

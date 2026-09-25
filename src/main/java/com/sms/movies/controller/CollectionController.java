@@ -52,7 +52,7 @@ public class CollectionController {
       summary = "Get a collection",
       description = "Returns an owned collection and a paginated list of its movies.")
   public CollectionDetails get(
-      @PathVariable @Positive long id,
+      @PathVariable java.util.UUID id,
       @RequestParam(defaultValue = "0") @Min(0) int page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
     return service.get(current.id(), id, page, size);
@@ -63,7 +63,7 @@ public class CollectionController {
       summary = "Rename a collection",
       description = "Changes the name of a collection owned by the authenticated user.")
   public CollectionResponse rename(
-      @PathVariable @Positive long id, @Valid @RequestBody NameRequest body) {
+      @PathVariable java.util.UUID id, @Valid @RequestBody NameRequest body) {
     return service.rename(current.id(), id, body.name());
   }
 
@@ -71,7 +71,7 @@ public class CollectionController {
   @Operation(
       summary = "Delete a collection",
       description = "Deletes an owned collection and its membership entries.")
-  public ResponseEntity<Void> delete(@PathVariable @Positive long id) {
+  public ResponseEntity<Void> delete(@PathVariable java.util.UUID id) {
     service.delete(current.id(), id);
     return ResponseEntity.noContent().build();
   }
@@ -81,7 +81,7 @@ public class CollectionController {
       summary = "Add a movie to a collection",
       description = "Adds a movie to an owned collection. Repeating the request is idempotent.")
   public ResponseEntity<Void> add(
-      @PathVariable @Positive long id, @PathVariable @Positive long movieId) {
+      @PathVariable java.util.UUID id, @PathVariable java.util.UUID movieId) {
     service.add(current.id(), id, movieId);
     return ResponseEntity.noContent().build();
   }
@@ -91,7 +91,7 @@ public class CollectionController {
       summary = "Remove a movie from a collection",
       description = "Removes a movie from an owned collection. Repeating the request is idempotent.")
   public ResponseEntity<Void> remove(
-      @PathVariable @Positive long id, @PathVariable @Positive long movieId) {
+      @PathVariable java.util.UUID id, @PathVariable java.util.UUID movieId) {
     service.remove(current.id(), id, movieId);
     return ResponseEntity.noContent().build();
   }

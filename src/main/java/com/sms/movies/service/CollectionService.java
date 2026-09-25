@@ -15,24 +15,22 @@ public class CollectionService {
   static final RowMapper<CollectionResponse> MAPPER =
       (r, n) ->
           new CollectionResponse(
-              r.getLong("id"),
+              r.getObject("id", UUID.class),
               r.getString("name"),
               r.getTimestamp("created_at").toInstant(),
               r.getTimestamp("updated_at").toInstant());
   private final SqlRepository sql;
   private final MovieService movies;
-  private final AuditService audit;
-  private final AnalyticsService analytics;
+  private final ActivityReporter activity;
 
   public CollectionService(
-      SqlRepository sql, MovieService movies, AuditService audit, AnalyticsService analytics) {
+      SqlRepository sql, MovieService movies, ActivityReporter activity) {
     this.sql = sql;
     this.movies = movies;
-    this.audit = audit;
-    this.analytics = analytics;
+    this.activity = activity;
   }
 
-  public CollectionResponse owned(long user, long id) {
+  public CollectionResponse owned(UUID user, UUID id) {
     var result =
         sql.one(
             "SELECT * FROM user_collection WHERE id=? AND user_id=? FOR UPDATE", MAPPER, id, user);
@@ -40,7 +38,7 @@ public class CollectionService {
     return result;
   }
 
-  public PageResponse<CollectionResponse> list(long user, int page, int size) {
+  public PageResponse<CollectionResponse> list(UUID user, int page, int size) {
     return SqlRepository.page(
         sql.list(
             "SELECT * FROM user_collection WHERE user_id=? ORDER BY id LIMIT ? OFFSET ?",
@@ -53,23 +51,23 @@ public class CollectionService {
         sql.count("SELECT COUNT(*) FROM user_collection WHERE user_id=?", user));
   }
 
-  public CollectionResponse create(long user, String name) {
-    long id =
-        sql.insert("INSERT INTO user_collection(user_id,name) VALUES(?,?)", user, name.strip());
-    audit.record(user, "COLLECTION_CREATED", "COLLECTION", id, "SUCCESS");
+  public CollectionResponse create(UUID user, String name) {
+    UUID id = UUID.randomUUID();
+    sql.update("INSERT INTO user_collection(id,user_id,name) VALUES(?,?,?)", id, user, name.strip());
+    activity.audit(user, "COLLECTION_CREATED", "COLLECTION", id, "SUCCESS");
     return owned(user, id);
   }
 
-  public CollectionDetails get(long user, long id, int page, int size) {
+  public CollectionDetails get(UUID user, UUID id, int page, int size) {
     return new CollectionDetails(owned(user, id), items(id, page, size));
   }
 
-  public PageResponse<MovieResponse> items(long id, int page, int size) {
+  public PageResponse<MovieResponse> items(UUID id, int page, int size) {
     var ids =
         sql.list(
             "SELECT movie_id FROM collection_item WHERE collection_id=? ORDER BY movie_id LIMIT ?"
                 + " OFFSET ?",
-            (r, n) -> r.getLong(1),
+            (r, n) -> r.getObject(1, UUID.class),
             id,
             size,
             (long) page * size);
@@ -80,23 +78,23 @@ public class CollectionService {
         sql.count("SELECT COUNT(*) FROM collection_item WHERE collection_id=?", id));
   }
 
-  public CollectionResponse rename(long user, long id, String name) {
+  public CollectionResponse rename(UUID user, UUID id, String name) {
     owned(user, id);
     sql.update(
         "UPDATE user_collection SET name=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
         name.strip(),
         id);
-    audit.record(user, "COLLECTION_RENAMED", "COLLECTION", id, "SUCCESS");
+    activity.audit(user, "COLLECTION_RENAMED", "COLLECTION", id, "SUCCESS");
     return owned(user, id);
   }
 
-  public void delete(long user, long id) {
+  public void delete(UUID user, UUID id) {
     owned(user, id);
     sql.update("DELETE FROM user_collection WHERE id=?", id);
-    audit.record(user, "COLLECTION_DELETED", "COLLECTION", id, "SUCCESS");
+    activity.audit(user, "COLLECTION_DELETED", "COLLECTION", id, "SUCCESS");
   }
 
-  public void add(long user, long id, long movie) {
+  public void add(UUID user, UUID id, UUID movie) {
     owned(user, id);
     movies.get(movie);
     if (sql.count(
@@ -104,18 +102,20 @@ public class CollectionService {
         == 0) {
       sql.update("INSERT INTO collection_item(collection_id,movie_id) VALUES(?,?)", id, movie);
       sql.update("UPDATE user_collection SET updated_at=CURRENT_TIMESTAMP WHERE id=?", id);
-      audit.record(user, "COLLECTION_ITEM_ADDED", "COLLECTION_ITEM", id + ":" + movie, "SUCCESS");
-      analytics.record(user, "collection_item_added", movie);
+      activity.audit(
+          user, "COLLECTION_ITEM_ADDED", "COLLECTION_ITEM", id + ":" + movie, "SUCCESS");
+      activity.analytics(user, "collection_item_added", movie);
     }
   }
 
-  public void remove(long user, long id, long movie) {
+  public void remove(UUID user, UUID id, UUID movie) {
     owned(user, id);
     if (sql.update("DELETE FROM collection_item WHERE collection_id=? AND movie_id=?", id, movie)
         > 0) {
       sql.update("UPDATE user_collection SET updated_at=CURRENT_TIMESTAMP WHERE id=?", id);
-      audit.record(user, "COLLECTION_ITEM_REMOVED", "COLLECTION_ITEM", id + ":" + movie, "SUCCESS");
-      analytics.record(user, "collection_item_removed", movie);
+      activity.audit(
+          user, "COLLECTION_ITEM_REMOVED", "COLLECTION_ITEM", id + ":" + movie, "SUCCESS");
+      activity.analytics(user, "collection_item_removed", movie);
     }
   }
 }

@@ -6,11 +6,13 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
-@Table("audit_log")
+@Table("audit_event")
 public record AuditLog(
     @Id UUID id,
-    @Column("user_id") UUID userId,
+    @Column("actor_user_id") UUID userId,
     String action,
-    String resource,
+    @Column("resource_type") String resourceType,
+    @Column("resource_id") String resourceId,
+    String outcome,
     @Column("occurred_at") Instant occurredAt,
     @Column("correlation_id") String correlationId) {}

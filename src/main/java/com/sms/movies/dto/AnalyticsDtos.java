@@ -15,7 +15,7 @@ public final class AnalyticsDtos {
   public record EventRequest(
       @NotNull UUID eventId,
       @NotNull ClientEvent eventName,
-      @NotNull @Positive Long movieId,
+      @NotNull java.util.UUID movieId,
       UUID journeyId,
       @NotNull @AssertTrue Boolean consentGranted) {}
 }

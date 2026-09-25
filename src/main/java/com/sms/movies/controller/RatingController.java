@@ -39,7 +39,7 @@ public class RatingController {
       summary = "Save a personal rating",
       description = "Creates or updates the authenticated user's rating for a movie.")
   public RatingResponse put(
-      @PathVariable @Positive long movieId, @Valid @RequestBody RatingRequest body) {
+      @PathVariable java.util.UUID movieId, @Valid @RequestBody RatingRequest body) {
     return service.put(current.id(), movieId, body.score());
   }
 
@@ -47,7 +47,7 @@ public class RatingController {
   @io.swagger.v3.oas.annotations.Operation(
       summary = "Delete a personal rating",
       description = "Removes the authenticated user's rating for a movie.")
-  public ResponseEntity<Void> delete(@PathVariable @Positive long movieId) {
+  public ResponseEntity<Void> delete(@PathVariable java.util.UUID movieId) {
     service.delete(current.id(), movieId);
     return ResponseEntity.noContent().build();
   }

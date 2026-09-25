@@ -14,19 +14,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class CatalogService {
   private final SqlRepository sql;
   private final MovieRepository movies;
-  private final AuditService audit;
-  private final AnalyticsService analytics;
+  private final ActivityReporter activity;
 
   public CatalogService(
-      SqlRepository sql, MovieRepository movies, AuditService audit, AnalyticsService analytics) {
+      SqlRepository sql, MovieRepository movies, ActivityReporter activity) {
     this.sql = sql;
     this.movies = movies;
-    this.audit = audit;
-    this.analytics = analytics;
+    this.activity = activity;
   }
 
   public PageResponse<MovieResponse> search(
-      long user, String q, Long cast, Long director, Long genre, int page, int size) {
+      UUID user, String q, UUID cast, UUID director, UUID genre, int page, int size) {
     var args = new ArrayList<Object>();
     String where = " WHERE 1=1";
     if (q != null && !q.isBlank()) {
@@ -69,10 +67,10 @@ public class CatalogService {
     var ids =
         sql.list(
             "SELECT m.\"ID\" FROM \"movies\" m" + where + " ORDER BY m.\"ID\" LIMIT ? OFFSET ?",
-            (r, n) -> r.getLong(1),
+            (r, n) -> r.getObject(1, UUID.class),
             args.toArray());
-    audit.record(user, "SEARCH", "MOVIE", null, "SUCCESS");
-    analytics.record(user, "search_completed", null);
+    activity.audit(user, "SEARCH", "MOVIE", null, "SUCCESS");
+    activity.analytics(user, "search_completed", null);
     return SqlRepository.page(
         ids.stream().map(id -> MovieResponse.from(movies.findById(id).orElseThrow())).toList(),
         page,
@@ -80,7 +78,7 @@ public class CatalogService {
         total);
   }
 
-  public MovieDetails details(long id, long user) {
+  public MovieDetails details(UUID id, UUID user) {
     var m = movies.findById(id).orElseThrow(() -> new MovieNotFoundException(id));
     var rating =
         sql.one(
@@ -105,7 +103,7 @@ public class CatalogService {
   public List<NamedItem> genres() {
     return sql.list(
         "SELECT id,name FROM genre ORDER BY name,id",
-        (r, n) -> new NamedItem(r.getLong(1), r.getString(2)));
+        (r, n) -> new NamedItem(r.getObject(1, UUID.class), r.getString(2)));
   }
 
   public PageResponse<NamedItem> people(String query, String role, int page, int size) {
@@ -131,7 +129,7 @@ public class CatalogService {
     return SqlRepository.page(
         sql.list(
             "SELECT p.id,p.name FROM person p" + where + " ORDER BY p.name,p.id LIMIT ? OFFSET ?",
-            (r, n) -> new NamedItem(r.getLong(1), r.getString(2)),
+            (r, n) -> new NamedItem(r.getObject(1, UUID.class), r.getString(2)),
             args.toArray()),
         page,
         size,
@@ -139,32 +137,34 @@ public class CatalogService {
   }
 
   public NamedItem createPerson(String name) {
-    return new NamedItem(
-        sql.insert("INSERT INTO person(name) VALUES(?)", name.strip()), name.strip());
+    UUID id = UUID.randomUUID();
+    sql.update("INSERT INTO person(id,name) VALUES(?,?)", id, name.strip());
+    return new NamedItem(id, name.strip());
   }
 
   public NamedItem createGenre(String name) {
-    return new NamedItem(
-        sql.insert("INSERT INTO genre(name) VALUES(?)", name.strip()), name.strip());
+    UUID id = UUID.randomUUID();
+    sql.update("INSERT INTO genre(id,name) VALUES(?,?)", id, name.strip());
+    return new NamedItem(id, name.strip());
   }
 
-  public List<Credit> credits(long movie) {
+  public List<Credit> credits(UUID movie) {
     return sql.list(
         "SELECT p.id,p.name,c.role FROM movie_credit c JOIN person p ON p.id=c.person_id WHERE"
             + " c.movie_id=? ORDER BY c.role,p.name,p.id",
-        (r, n) -> new Credit(r.getLong(1), r.getString(2), r.getString(3)),
+        (r, n) -> new Credit(r.getObject(1, UUID.class), r.getString(2), r.getString(3)),
         movie);
   }
 
-  public List<NamedItem> movieGenres(long movie) {
+  public List<NamedItem> movieGenres(UUID movie) {
     return sql.list(
         "SELECT g.id,g.name FROM movie_genre mg JOIN genre g ON g.id=mg.genre_id WHERE"
             + " mg.movie_id=? ORDER BY g.name,g.id",
-        (r, n) -> new NamedItem(r.getLong(1), r.getString(2)),
+        (r, n) -> new NamedItem(r.getObject(1, UUID.class), r.getString(2)),
         movie);
   }
 
-  public List<ExternalRating> externalRatings(long movie) {
+  public List<ExternalRating> externalRatings(UUID movie) {
     return sql.list(
         "SELECT * FROM external_rating WHERE movie_id=? ORDER BY source",
         (r, n) ->
@@ -177,39 +177,41 @@ public class CatalogService {
         movie);
   }
 
-  public void sync(long movie, MovieRequest request) {
+  public void sync(UUID movie, MovieRequest request) {
     sql.update("DELETE FROM movie_credit WHERE movie_id=?", movie);
     sql.update("DELETE FROM movie_genre WHERE movie_id=?", movie);
     // Legacy single director/genre fields remain convenient inputs; IDs distinguish namesakes.
-    Long director =
+    UUID director =
         sql.one(
             "SELECT id FROM person WHERE name=? ORDER BY id LIMIT 1",
-            (r, n) -> r.getLong(1),
+            (r, n) -> r.getObject(1, UUID.class),
             request.director().strip());
     if (director == null) director = createPerson(request.director()).id();
-    Long genre =
+    UUID genre =
         sql.one(
-            "SELECT id FROM genre WHERE name=?", (r, n) -> r.getLong(1), request.genre().strip());
+            "SELECT id FROM genre WHERE name=?",
+            (r, n) -> r.getObject(1, UUID.class),
+            request.genre().strip());
     if (genre == null) genre = createGenre(request.genre()).id();
-    Set<Long> directors = new HashSet<>();
+    Set<UUID> directors = new HashSet<>();
     directors.add(director);
     if (request.directorIds() != null) directors.addAll(request.directorIds());
-    Set<Long> genres = new HashSet<>();
+    Set<UUID> genres = new HashSet<>();
     genres.add(genre);
     if (request.genreIds() != null) genres.addAll(request.genreIds());
-    for (long id : directors)
+    for (UUID id : directors)
       sql.update(
           "INSERT INTO movie_credit(movie_id,person_id,role) VALUES(?,?,'DIRECTOR')", movie, id);
     if (request.castIds() != null)
-      for (long id : new HashSet<>(request.castIds()))
+      for (UUID id : new HashSet<>(request.castIds()))
         sql.update(
             "INSERT INTO movie_credit(movie_id,person_id,role) VALUES(?,?,'CAST')", movie, id);
-    for (long id : genres)
+    for (UUID id : genres)
       sql.update("INSERT INTO movie_genre(movie_id,genre_id) VALUES(?,?)", movie, id);
   }
 
   public ExternalRating putExternal(
-      long user, long movie, String source, ExternalRatingRequest request) {
+      UUID user, UUID movie, String source, ExternalRatingRequest request) {
     if (request.score() > request.scaleMax()
         || !Double.isFinite(request.score())
         || !Double.isFinite(request.scaleMax()))
@@ -217,7 +219,7 @@ public class CatalogService {
           HttpStatus.BAD_REQUEST, "Rating must be finite and within its source scale.");
     if (sql.one(
             "SELECT \"ID\" FROM \"movies\" WHERE \"ID\"=? FOR UPDATE",
-            (r, n) -> r.getLong(1),
+            (r, n) -> r.getObject(1, UUID.class),
             movie)
         == null) throw new MovieNotFoundException(movie);
     int updated =
@@ -239,7 +241,7 @@ public class CatalogService {
           request.score(),
           request.scaleMax(),
           request.voteCount());
-    audit.record(user, "EXTERNAL_RATING_UPDATED", "MOVIE", movie, "SUCCESS");
+    activity.audit(user, "EXTERNAL_RATING_UPDATED", "MOVIE", movie, "SUCCESS");
     return externalRatings(movie).stream()
         .filter(r -> r.source().equals(source))
         .findFirst()

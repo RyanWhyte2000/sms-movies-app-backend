@@ -18,10 +18,10 @@ public interface PersonalRatingRepository extends ListCrudRepository<PersonalRat
   @Modifying
   @Query(
       """
-      INSERT INTO personal_ratings (id, user_id, movie_id, score, created_at)
-      VALUES (:id, :userId, :movieId, :score, CURRENT_TIMESTAMP)
+      INSERT INTO personal_rating (id, user_id, movie_id, score, created_at, updated_at)
+      VALUES (:id, :userId, :movieId, :score, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (user_id, movie_id)
-      DO UPDATE SET score = EXCLUDED.score
+      DO UPDATE SET score = EXCLUDED.score, updated_at = CURRENT_TIMESTAMP
       """)
   int upsert(UUID id, UUID userId, UUID movieId, int score);
 }

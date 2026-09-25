@@ -6,10 +6,7 @@ import org.springframework.stereotype.Component;
 
 /** Local TF-IDF/cosine baseline. Text is data; it is never executed or sent to a provider. */
 @Component
-public class ContentRecommendationEngine {
-  public record Document(long id, String text) {}
-
-  public record Match(long id, double score) {}
+public class ContentRecommendationEngine implements RecommendationEngine {
 
   private static final Set<String> STOP =
       Set.of(
@@ -45,7 +42,8 @@ public class ContentRecommendationEngine {
           "it");
   private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]+");
 
-  public List<Match> rank(String query, List<Document> documents, Set<Long> excluded, int limit) {
+  @Override
+  public List<Match> rank(String query, List<Document> documents, Set<UUID> excluded, int limit) {
     if (documents.isEmpty()) return List.of();
     var tokens = new ArrayList<Map<String, Double>>();
     var frequencies = new HashMap<String, Integer>();
@@ -70,9 +68,14 @@ public class ContentRecommendationEngine {
       if (score >= 0.05) results.add(new Match(documents.get(i).id(), score));
     }
     return results.stream()
-        .sorted(Comparator.comparingDouble(Match::score).reversed().thenComparingLong(Match::id))
+        .sorted(Comparator.comparingDouble(Match::score).reversed().thenComparing(Match::id))
         .limit(limit)
         .toList();
+  }
+
+  @Override
+  public String name() {
+    return "local-tfidf-v1";
   }
 
   private Map<String, Double> terms(String text) {
