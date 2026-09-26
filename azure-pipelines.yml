@@ -20,9 +20,9 @@ pool:
 variables:
   mavenCache: $(Pipeline.Workspace)/.m2/repository
   helmVersion: '3.17.3'
-  azureServiceConnection: 'smsmovies2'
-  azureResourceGroup: 'smsmovies'
-  appServiceName: 'smsmovies'
+  azureServiceConnection: 'sms-movies'
+  azureResourceGroup: 'sms-movies'
+  appServiceName: 'smsmoviesapi'
   acrName: 'smsMovies'
 
 stages:

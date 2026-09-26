@@ -36,13 +36,14 @@ GitHub; Azure Repos uses branch policies instead.
 
 Create or select these resources before the first image push:
 
-1. An Azure Resource Manager service connection named `smsmovies2` with
-   `AcrPush` on the registry and permission to update the App Service Web App. The
-   pipeline deliberately does not create role assignments, so this connection
-   does not need Owner or User Access Administrator.
+1. An Azure Resource Manager service connection named `smsmovies2`. Its service
+   principal needs `AcrPush` on the registry and `Website Contributor` on the App
+   Service Web App (or its resource group). The pipeline deliberately does not
+   create role assignments, so this connection does not need Owner or User Access
+   Administrator.
 2. An Azure Container Registry matching `acrName` in the pipeline. Registry names
    are globally unique.
-3. A resource group named `sms-movies` and a Linux App Service Web App named
+3. A resource group named `smsmovies` and a Linux App Service Web App named
    `smsmovies`, configured to run a custom container. Change `appServiceName` in
    the pipeline if your Web App uses a different globally unique name.
 
@@ -53,7 +54,7 @@ on the registry. This is a one-time setup action:
 ```bash
 principal_id=$(az webapp identity assign \
   --name smsmovies \
-  --resource-group sms-movies \
+  --resource-group smsmovies \
   --query principalId \
   --output tsv)
 acr_id=$(az acr show --name smsMovies --query id --output tsv)
