@@ -75,4 +75,29 @@ class DiscoveryServiceTest {
     assertTrue(excluded.getValue().containsAll(Set.of(liked, disliked)));
     verify(activity).analytics(user, "recommendation_completed", null);
   }
+
+  @Test
+  void providerFallbackStillUsesLocallyRankedMatches() {
+    var movies = mock(MovieRepository.class);
+    var sql = mock(SqlRepository.class);
+    var engine = mock(RecommendationEngine.class);
+    var activity = mock(ActivityReporter.class);
+    var service = new DiscoveryService(movies, sql, engine, activity);
+    var user = UUID.randomUUID();
+    var id = UUID.randomUUID();
+    when(movies.findAll(any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(movie(id, "Moon"))));
+    when(engine.rankWithStatus(anyString(), anyList(), anySet(), eq(5)))
+        .thenReturn(
+            new RecommendationEngine.Outcome(
+                "llm+local", true, "Provider unavailable.",
+                List.of(new RecommendationEngine.Match(id, .75))));
+    when(activity.correlationId()).thenReturn("corr");
+
+    var result = service.search(user, "space", 5);
+
+    assertTrue(result.fallbackUsed());
+    assertEquals(id, result.results().get(0).movie().id());
+    assertEquals(.75, result.results().get(0).relevance());
+  }
 }

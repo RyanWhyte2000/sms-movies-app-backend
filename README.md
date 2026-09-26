@@ -49,6 +49,12 @@ With the disposable local database, bootstrap runs again after every app restart
 | `APP_RATE_LIMIT_REQUESTS` | Requests allowed per window and application instance; default `120` |
 | `APP_RATE_LIMIT_WINDOW` | Window duration, such as `60s` or `5m`; default `60s` |
 | `APP_RATE_LIMIT_MAX_TRACKED_CLIENTS` | Memory-safety cap for tracked client addresses; default `100000` |
+| `APP_AI_ENABLED` | Enable OpenAI-assisted discovery; default `false` |
+| `OPENAI_API_KEY` | Server-side OpenAI credential; required when AI is enabled |
+| `OPENAI_MODEL` | Pinned discovery model; default `gpt-4.1-mini-2025-04-14` |
+| `APP_AI_CONNECT_TIMEOUT`, `APP_AI_READ_TIMEOUT` | Provider timeouts; defaults `2s` and `5s` |
+| `APP_AI_MINIMUM_CONFIDENCE` | Below this value local ranking is used; default `0.55` |
+| `APP_AI_CANDIDATE_LIMIT` | Maximum catalogue candidates sent per call; default `80` |
 | `SERVER_SERVLET_SESSION_COOKIE_SECURE` | Set true for HTTPS deployments |
 | `SERVER_SERVLET_SESSION_COOKIE_SAME_SITE` | Default lax; assess explicitly for cross-site deployments |
 
@@ -116,11 +122,18 @@ account validation, ownership, rating integrity, membership/event idempotency,
 sharing expiry/revocation, audit writes, analytics validation and local ranking.
 The test profile uses H2; production-database and cluster tests remain separate.
 
+## LLM-assisted discovery
+
+Set `APP_AI_ENABLED=true` and provide `OPENAI_API_KEY` to enable validated LLM ranking
+for natural-language search and personalized recommendations. Without credentials,
+or on provider failure or low confidence, discovery automatically uses the local
+TF-IDF engine. See [the AI discovery design, safety and evaluation guide](docs/ai-discovery.md).
+
 ## Discovery and integration limits
 
-AI endpoints use a local TF-IDF content-based baseline with personalization and an
-explicit fallback. They run without external credentials; they are not an LLM and
-do not provide full semantic understanding. Corpus size is capped at 1000 movies.
+AI endpoints can use validated OpenAI Structured Outputs with a local TF-IDF fallback.
+They continue to run without external credentials, with reduced semantic understanding.
+The catalogue loaded for discovery is currently capped at 1000 movies.
 Third-party ratings can be imported by an admin and displayed with their source
 and scale, but no external movie-data provider is configured. The detailed API
 guide describes these limitations and response contracts.

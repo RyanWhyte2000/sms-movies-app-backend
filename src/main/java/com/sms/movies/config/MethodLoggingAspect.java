@@ -1,5 +1,6 @@
 package com.sms.movies.config;
 
+import com.sms.movies.exception.ApiException;
 import java.util.Optional;
 import java.util.UUID;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -44,15 +45,34 @@ public class MethodLoggingAspect {
           elapsedMilliseconds(startedAt));
       return result;
     } catch (Throwable failure) {
-      log.error(
-          "THROW method={} correlationId={} invocationId={} durationMs={}",
-          method,
-          correlationId,
-          invocationId,
-          elapsedMilliseconds(startedAt),
-          failure);
+      long duration = elapsedMilliseconds(startedAt);
+      if (isExpectedClientFailure(failure)) {
+        log.warn(
+            "REJECT method={} correlationId={} invocationId={} durationMs={} exception={} message={}",
+            method,
+            correlationId,
+            invocationId,
+            duration,
+            failure.getClass().getSimpleName(),
+            failure.getMessage());
+      } else {
+        log.error(
+            "THROW method={} correlationId={} invocationId={} durationMs={}",
+            method,
+            correlationId,
+            invocationId,
+            duration,
+            failure);
+      }
       throw failure;
     }
+  }
+
+  private boolean isExpectedClientFailure(Throwable failure) {
+    return (failure instanceof ApiException apiException
+            && apiException.status().is4xxClientError())
+        || failure instanceof org.springframework.security.core.AuthenticationException
+        || failure instanceof org.springframework.security.access.AccessDeniedException;
   }
 
   private long elapsedMilliseconds(long startedAt) {

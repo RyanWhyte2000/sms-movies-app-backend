@@ -16,9 +16,9 @@ The root `azure-pipelines.yml` is a CI pipeline for Azure DevOps Services. It:
    stage that builds on the Microsoft-hosted agent and pushes the immutable
    `movies-api:$(Build.BuildId)` image to ACR. It does not use server-side ACR
    Tasks, which can be unavailable on free subscriptions.
-9. Runs `DeployContainerApp` after the image push, deploying that exact immutable
-   tag with external ingress on port 8080. It limits the app to 0.5 vCPU, 1 GiB of
-   memory, zero minimum replicas and one maximum replica.
+9. Runs `DeployAppService` after the image push, deploying that exact immutable
+   tag to an existing Linux Web App for Containers. It configures App Service to
+   route traffic to the application's port 8080.
 
 ## Connect the pipeline
 
@@ -37,23 +37,23 @@ GitHub; Azure Repos uses branch policies instead.
 Create or select these resources before the first image push:
 
 1. An Azure Resource Manager service connection named `smsmovies2` with
-   `AcrPush` on the registry and permission to update the Container App. The
+   `AcrPush` on the registry and permission to update the App Service Web App. The
    pipeline deliberately does not create role assignments, so this connection
    does not need Owner or User Access Administrator.
 2. An Azure Container Registry matching `acrName` in the pipeline. Registry names
    are globally unique.
-3. A resource group named `sms-movies`, a Consumption-plan Container Apps
-   environment, and a Container App named `smsmovies` in `westus2`.
+3. A resource group named `sms-movies` and a Linux App Service Web App named
+   `smsmovies`, configured to run a custom container. Change `appServiceName` in
+   the pipeline if your Web App uses a different globally unique name.
 
 Before the first deployment, an Azure subscription Owner or User Access
-Administrator must grant the Container App's system-assigned identity `AcrPull`
+Administrator must grant the Web App's system-assigned identity `AcrPull`
 on the registry. This is a one-time setup action:
 
 ```bash
-principal_id=$(az containerapp identity assign \
+principal_id=$(az webapp identity assign \
   --name smsmovies \
   --resource-group sms-movies \
-  --system-assigned \
   --query principalId \
   --output tsv)
 acr_id=$(az acr show --name smsMovies --query id --output tsv)
@@ -64,15 +64,15 @@ az role assignment create \
   --scope "$acr_id"
 ```
 
-After that assignment exists, the pipeline configures the app to authenticate to
-ACR with its system identity and deploys without modifying Azure RBAC.
+After that assignment exists, the pipeline configures App Service to authenticate
+to ACR with its system identity, applies the application settings, selects the
+new image, and restarts the Web App. The service connection needs permission to
+update that Web App. Role assignments can take several minutes to propagate.
 
-If Azure reports only `Operation expired`, the deployment step prints the latest
-revision state plus Container Apps system and application logs. `ErrImagePull`
-means the one-time `AcrPull` assignment is missing or has not propagated yet.
-`ContainerCrashing` normally means the Spring application could not start; check
-the application-log section for database connectivity, credentials, or Flyway
-errors. Role assignments can take several minutes to propagate.
+If the container cannot start, use **Deployment Center → Logs** in the Web App.
+Image-pull failures usually mean the one-time `AcrPull` assignment is missing;
+application startup failures commonly indicate database connectivity,
+credentials, or Flyway errors.
 
 Add `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, and
 `APP_CORS_ALLOWED_ORIGINS` as Azure DevOps pipeline variables. Mark the three

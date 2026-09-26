@@ -39,7 +39,10 @@ class CurrentUserTest {
 
     SecurityContextHolder.getContext().setAuthentication(new AnonymousAuthenticationToken(
         "key", "anonymous", AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")));
+    clearInvocations(users);
+    assertThrows(ApiException.class, current::get);
     assertNull(current.idOrNull());
+    verifyNoInteractions(users);
 
     SecurityContextHolder.getContext().setAuthentication(
         UsernamePasswordAuthenticationToken.authenticated("missing@example.com", "x", List.of()));

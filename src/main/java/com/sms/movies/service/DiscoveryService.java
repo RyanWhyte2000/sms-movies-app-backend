@@ -7,7 +7,6 @@ import com.sms.movies.repository.*;
 import java.util.*;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DiscoveryService {
@@ -27,12 +26,10 @@ public class DiscoveryService {
     this.activity = activity;
   }
 
-  @Transactional
   public DiscoveryResponse search(UUID user, String query, int limit) {
     return discover(user, query, limit, false);
   }
 
-  @Transactional
   public DiscoveryResponse recommendations(UUID user, String prompt, int limit) {
     return discover(user, prompt, limit, true);
   }
@@ -72,10 +69,16 @@ public class DiscoveryService {
         if (preferred.contains(document.id())) profile.append(" ").append(document.text());
       query = profile.toString();
     }
-    var matches = engine.rank(query, documents, excluded, limit);
-    boolean fallback = matches.isEmpty();
+    var outcome = engine.rankWithStatus(query, documents, excluded, limit);
+    // Mockito and legacy third-party engines may not implement the status-aware method yet.
+    if (outcome == null)
+      outcome =
+          new RecommendationEngine.Outcome(
+              engine.name(), false, "Ranked results.", engine.rank(query, documents, excluded, limit));
+    var matches = outcome.matches();
+    boolean fallback = outcome.fallbackUsed() || matches.isEmpty();
     List<RankedMovie> results;
-    if (fallback)
+    if (matches.isEmpty())
       results =
           catalogue.stream()
               .filter(m -> !excluded.contains(m.id()))
@@ -97,10 +100,12 @@ public class DiscoveryService {
                       new RankedMovie(
                           MovieResponse.from(index.get(match.id())),
                           match.score(),
-                          personalized
-                              ? "Content similarity to your preferences and saved or highly rated"
-                                    + " movies."
-                              : "Content similarity to your search terms."))
+                          match.explanation() != null && !match.explanation().isBlank()
+                              ? match.explanation()
+                              : personalized
+                                  ? "Content similarity to your preferences and saved or highly"
+                                      + " rated movies."
+                                  : "Content similarity to your search terms."))
               .toList();
     }
     String type = personalized ? "RECOMMENDATION" : "NATURAL_LANGUAGE_SEARCH";
@@ -113,18 +118,17 @@ public class DiscoveryService {
             + " VALUES(?,?,?,?,?,?,?)",
         user,
         type,
-        engine.name(),
+        outcome.engine(),
         fallback,
         results.size(),
         (System.nanoTime() - start) / 1_000_000,
         activity.correlationId());
     return new DiscoveryResponse(
-        engine.name(),
+        outcome.engine(),
         fallback,
-        fallback
-            ? "No confident match or insufficient history; returning recent unseen catalogue"
-                  + " entries."
-            : "Local content-based ranking; relevance is a similarity score, not a probability.",
+        matches.isEmpty()
+            ? outcome.message() + " Returning recent unseen catalogue entries."
+            : outcome.message(),
         results);
   }
 

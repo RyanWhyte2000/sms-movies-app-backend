@@ -1,4 +1,4 @@
-# Azure DevOps Services CI with image publishing to Azure Container Registry.
+# Azure DevOps Services CI/CD for Azure App Service using an ACR image.
 name: movies-$(Date:yyyyMMdd).$(Rev:r)
 
 trigger:
@@ -22,9 +22,7 @@ variables:
   helmVersion: '3.17.3'
   azureServiceConnection: 'smsmovies2'
   azureResourceGroup: 'sms-movies'
-  azureLocation: 'westus2'
-  containerAppEnvironment: 'smsmovies'
-  containerAppName: 'smsmovies'
+  appServiceName: 'smsmovies'
   acrName: 'smsMovies'
 
 stages:
@@ -175,19 +173,19 @@ stages:
                 docker push "$image"
                 echo "Pushed image: $image"
 
-  - stage: DeployContainerApp
-    displayName: Deploy Azure Container App
+  - stage: DeployAppService
+    displayName: Deploy to Azure App Service
     dependsOn: BuildAndPushImage
     condition: succeeded()
     jobs:
       - job: Deploy
-        displayName: Deploy immutable ACR image
+        displayName: Deploy immutable ACR image to Web App
         timeoutInMinutes: 30
         steps:
           - checkout: none
 
           - task: AzureCLI@2
-            displayName: Configure identity and deploy movies API
+            displayName: Configure and deploy App Service container
             inputs:
               azureSubscription: $(azureServiceConnection)
               scriptType: bash
@@ -202,14 +200,15 @@ stages:
                     exit 1
                   fi
                 done
-                environment_values=(
+                app_settings=(
                   "SPRING_PROFILES_ACTIVE=production"
                   "DATABASE_URL=$DATABASE_URL"
                   "DATABASE_USERNAME=$DATABASE_USERNAME"
                   "DATABASE_PASSWORD=$DATABASE_PASSWORD"
+                  "WEBSITES_PORT=8080"
                 )
                 if [[ -n "${APP_CORS_ALLOWED_ORIGINS:-}" && "$APP_CORS_ALLOWED_ORIGINS" != '$('* ]]; then
-                  environment_values+=("APP_CORS_ALLOWED_ORIGINS=$APP_CORS_ALLOWED_ORIGINS")
+                  app_settings+=("APP_CORS_ALLOWED_ORIGINS=$APP_CORS_ALLOWED_ORIGINS")
                 fi
 
                 az acr show \
@@ -220,129 +219,47 @@ stages:
                 read -r login_server < "$AGENT_TEMPDIRECTORY/acr-login-server"
                 image="${login_server}/movies-api:$(Build.BuildId)"
 
-                az containerapp identity assign \
-                  --name "$(containerAppName)" \
+                az webapp identity assign \
+                  --name "$(appServiceName)" \
                   --resource-group "$(azureResourceGroup)" \
-                  --system-assigned \
-                  --only-show-errors > /dev/null
+                  --only-show-errors \
+                  --output none
 
-                az containerapp registry set \
-                  --name "$(containerAppName)" \
+                az webapp config set \
+                  --name "$(appServiceName)" \
                   --resource-group "$(azureResourceGroup)" \
-                  --server "$login_server" \
-                  --identity system \
+                  --generic-configurations '{"acrUseManagedIdentityCreds": true}' \
+                  --only-show-errors \
+                  --output none
+
+                az webapp config appsettings set \
+                  --name "$(appServiceName)" \
+                  --resource-group "$(azureResourceGroup)" \
+                  --settings "${app_settings[@]}" \
+                  --only-show-errors \
+                  --output none
+
+                az webapp config container set \
+                  --name "$(appServiceName)" \
+                  --resource-group "$(azureResourceGroup)" \
+                  --container-image-name "$image" \
+                  --container-registry-url "https://${login_server}" \
+                  --enable-app-service-storage false \
+                  --only-show-errors \
+                  --output none
+
+                az webapp restart \
+                  --name "$(appServiceName)" \
+                  --resource-group "$(azureResourceGroup)" \
                   --only-show-errors
-                az containerapp ingress enable \
-                  --name "$(containerAppName)" \
+
+                hostname="$(az webapp show \
+                  --name "$(appServiceName)" \
                   --resource-group "$(azureResourceGroup)" \
-                  --type external \
-                  --target-port 8080 \
-                  --only-show-errors
-
-                revision_suffix="b$(Build.BuildId)-a$(System.JobAttempt)"
-                revision_name=""
-
-                print_diagnostics() {
-                  set +e
-                  echo "Revision status:"
-                  az containerapp revision list \
-                    --name "$(containerAppName)" \
-                    --resource-group "$(azureResourceGroup)" \
-                    --all \
-                    --query "[].{Name:name,Active:properties.active,Provisioning:properties.provisioningState,Running:properties.runningState,Health:properties.healthState,Error:properties.provisioningError,Created:properties.createdTime}" \
-                    --output table
-                  echo "System logs:"
-                  log_revision_args=()
-                  if [[ -n "$revision_name" ]]; then
-                    log_revision_args=(--revision "$revision_name")
-                  fi
-                  az containerapp logs show \
-                    --name "$(containerAppName)" \
-                    --resource-group "$(azureResourceGroup)" \
-                    "${log_revision_args[@]}" \
-                    --type system \
-                    --tail 100 \
-                    --format text
-                  echo "Application logs (when a replica was created):"
-                  az containerapp logs show \
-                    --name "$(containerAppName)" \
-                    --resource-group "$(azureResourceGroup)" \
-                    "${log_revision_args[@]}" \
-                    --type console \
-                    --tail 100 \
-                    --format text
-                  set -e
-                }
-
-                if ! az containerapp update \
-                    --name "$(containerAppName)" \
-                    --resource-group "$(azureResourceGroup)" \
-                    --image "$image" \
-                    --cpu 0.5 \
-                    --memory 1.0Gi \
-                    --min-replicas 0 \
-                    --max-replicas 1 \
-                    --revision-suffix "$revision_suffix" \
-                    --set-env-vars "${environment_values[@]}" \
-                    --no-wait \
-                    --only-show-errors; then
-                  echo "##vso[task.logissue type=error]Azure rejected the Container App update request."
-                  print_diagnostics
-                  exit 1
-                fi
-
-                echo "Update accepted. Waiting for revision suffix $revision_suffix to provision."
-                for attempt in {1..60}; do
-                  revision_name="$(az containerapp revision list \
-                    --name "$(containerAppName)" \
-                    --resource-group "$(azureResourceGroup)" \
-                    --all \
-                    --query "[?ends_with(name, '-${revision_suffix}')].name | [0]" \
-                    --output tsv \
-                    --only-show-errors || true)"
-
-                  if [[ -n "$revision_name" ]]; then
-                    read -r provisioning_state running_state < <(az containerapp revision show \
-                      --name "$(containerAppName)" \
-                      --resource-group "$(azureResourceGroup)" \
-                      --revision "$revision_name" \
-                      --query "[properties.provisioningState, properties.runningState]" \
-                      --output tsv \
-                      --only-show-errors || true)
-                    echo "Attempt $attempt/60: revision=$revision_name provisioning=${provisioning_state:-unknown} running=${running_state:-unknown}"
-
-                    if [[ "$provisioning_state" == "Provisioned" ]]; then
-                      break
-                    fi
-                    if [[ "$provisioning_state" == "Failed" || "$running_state" == "Failed" || "$running_state" == "Degraded" ]]; then
-                      provisioning_error="$(az containerapp revision show \
-                        --name "$(containerAppName)" \
-                        --resource-group "$(azureResourceGroup)" \
-                        --revision "$revision_name" \
-                        --query "properties.provisioningError" \
-                        --output tsv \
-                        --only-show-errors || true)"
-                      echo "##vso[task.logissue type=error]Revision $revision_name failed: ${provisioning_error:-no provisioning error was returned}."
-                      print_diagnostics
-                      exit 1
-                    fi
-                  else
-                    echo "Attempt $attempt/60: Azure has not exposed the new revision yet."
-                  fi
-
-                  if [[ "$attempt" == "60" ]]; then
-                    echo "##vso[task.logissue type=error]Revision with suffix $revision_suffix did not provision within 10 minutes."
-                    print_diagnostics
-                    exit 1
-                  fi
-                  sleep 10
-                done
-
-                az containerapp show \
-                  --name "$(containerAppName)" \
-                  --resource-group "$(azureResourceGroup)" \
-                  --query "properties.configuration.ingress.fqdn" \
-                  --output tsv
+                  --query defaultHostName \
+                  --output tsv \
+                  --only-show-errors)"
+                echo "Deployed $image to https://$hostname"
             env:
               DATABASE_URL: $(DATABASE_URL)
               DATABASE_USERNAME: $(DATABASE_USERNAME)

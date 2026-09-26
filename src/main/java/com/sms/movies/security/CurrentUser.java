@@ -18,7 +18,12 @@ public class CurrentUser {
 
   public UserResponse get() {
     var authentication = SecurityContextHolder.getContext().getAuthentication();
-    var account = authentication == null ? null : users.find(authentication.getName());
+    if (authentication == null
+        || !authentication.isAuthenticated()
+        || authentication instanceof AnonymousAuthenticationToken) {
+      throw new ApiException(HttpStatus.UNAUTHORIZED, "Sign in to continue.");
+    }
+    var account = users.find(authentication.getName());
     if (account == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "Sign in to continue.");
     return account.user();
   }
