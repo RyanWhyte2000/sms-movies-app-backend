@@ -21,7 +21,7 @@ variables:
   mavenCache: $(Pipeline.Workspace)/.m2/repository
   helmVersion: '3.17.3'
   azureServiceConnection: 'smsmovies2'
-  azureResourceGroup: 'sms-movies'
+  azureResourceGroup: 'smsmovies'
   appServiceName: 'smsmovies'
   acrName: 'smsMovies'
 
