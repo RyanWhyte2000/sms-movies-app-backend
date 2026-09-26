@@ -49,8 +49,13 @@ public class AuthController {
   @io.swagger.v3.oas.annotations.Operation(
       summary = "Register an account",
       description = "Creates a user account and its default movie collection.")
-  public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest body) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(accounts.register(body));
+  public ResponseEntity<UserResponse> register(
+      @Valid @RequestBody RegisterRequest body,
+      HttpServletRequest request,
+      HttpServletResponse response) {
+    UserResponse registered = accounts.register(body);
+    establishSession(body.email(), body.password(), request, response);
+    return ResponseEntity.status(HttpStatus.CREATED).body(registered);
   }
 
   @PostMapping("/login")
@@ -61,12 +66,21 @@ public class AuthController {
       @Valid @RequestBody LoginRequest body,
       HttpServletRequest request,
       HttpServletResponse response) {
-    String email = AccountService.normalizeEmail(body.email());
+    establishSession(body.email(), body.password(), request, response);
+    return current.get();
+  }
+
+  private void establishSession(
+      String rawEmail,
+      String password,
+      HttpServletRequest request,
+      HttpServletResponse response) {
+    String email = AccountService.normalizeEmail(rawEmail);
     org.springframework.security.core.Authentication result;
     try {
       result =
           authentication.authenticate(
-              UsernamePasswordAuthenticationToken.unauthenticated(email, body.password()));
+              UsernamePasswordAuthenticationToken.unauthenticated(email, password));
     } catch (AuthenticationException exception) {
       var user = users.find(email);
       audit.record(user == null ? null : user.user().id(), "LOGIN", "USER", null, "FAILURE");
@@ -80,7 +94,6 @@ public class AuthController {
     context.setAuthentication(result);
     SecurityContextHolder.setContext(context);
     contexts.saveContext(context, request, response);
-    return current.get();
   }
 
   @PostMapping("/logout")

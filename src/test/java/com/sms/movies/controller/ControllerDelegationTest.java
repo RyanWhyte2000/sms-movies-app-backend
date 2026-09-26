@@ -14,7 +14,6 @@ import com.sms.movies.service.*;
 import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.web.csrf.CsrfToken;
 
 class ControllerDelegationTest {
   private static final UUID USER = UUID.randomUUID();
@@ -41,10 +40,6 @@ class ControllerDelegationTest {
     assertEquals(202, new AnalyticsController(analytics, current).accept(event).getStatusCode().value());
     verify(analytics).accept(USER, event);
 
-    var csrf = mock(CsrfToken.class);
-    when(csrf.getHeaderName()).thenReturn("X-CSRF");
-    when(csrf.getToken()).thenReturn("token");
-    assertEquals("token", new CsrfController().token(csrf).token());
   }
 
   @Test

@@ -12,7 +12,6 @@ import org.springframework.security.crypto.password.*;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.session.*;
 import org.springframework.security.web.context.*;
-import org.springframework.security.web.csrf.*;
 
 @Configuration
 @EnableMethodSecurity
@@ -47,22 +46,15 @@ public class SecurityConfig {
   }
 
   @Bean
-  CsrfTokenRepository csrfTokenRepository() {
-    return new HttpSessionCsrfTokenRepository();
+  SessionAuthenticationStrategy sessionAuthenticationStrategy() {
+    return new ChangeSessionIdAuthenticationStrategy();
   }
 
   @Bean
-  SessionAuthenticationStrategy sessionAuthenticationStrategy(CsrfTokenRepository csrf) {
-    return new CompositeSessionAuthenticationStrategy(
-        List.of(new ChangeSessionIdAuthenticationStrategy(), new CsrfAuthenticationStrategy(csrf)));
-  }
-
-  @Bean
-  SecurityFilterChain securityFilterChain(
-      HttpSecurity http, CsrfTokenRepository csrfTokenRepository) throws Exception {
+  SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     return http.cors(org.springframework.security.config.Customizer.withDefaults())
         .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-        .csrf(csrf -> csrf.csrfTokenRepository(csrfTokenRepository))
+        .csrf(csrf -> csrf.disable())
         .requestCache(c -> c.disable())
         .formLogin(c -> c.disable())
         .httpBasic(c -> c.disable())
@@ -85,7 +77,7 @@ public class SecurityConfig {
     config.setAllowedOrigins(allowed);
     config.setAllowCredentials(true);
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-    config.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN"));
+    config.setAllowedHeaders(List.of("Content-Type"));
     config.setExposedHeaders(
         List.of(
             "X-Correlation-ID",

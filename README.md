@@ -14,14 +14,16 @@ With a JDK 17 or newer installed:
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-The `local` profile initializes an in-memory H2 database and session tables, and
+The default `local` profile initializes an in-memory H2 database and session tables, and
 disables Docker Compose. Data disappears when the app stops. Swagger UI is at
 `http://localhost:8080/swagger-ui/index.html`; OpenAPI is at `/v3/api-docs`.
+IDE launches use `local` automatically unless an active profile is configured.
+Production must use the `production` profile and provide `DATABASE_URL`,
+`DATABASE_USERNAME`, and `DATABASE_PASSWORD`.
 
 Accounts are persisted in the database. Register and log in through the API; there
-is no generated Spring password or default account. Before any write, get a CSRF
-token from `/api/csrf` and retain the session cookie. Login rotates both the session
-ID and CSRF token; fetch a fresh token afterwards. See the API guide for details.
+is no generated Spring password or default account. Retain the session cookie and
+send it with private API requests. See the API guide for details.
 
 For catalogue administration, optionally set `APP_ADMIN_EMAIL` and
 `APP_ADMIN_PASSWORD` before startup. A new ADMIN account is created once, with a
@@ -34,8 +36,13 @@ With the disposable local database, bootstrap runs again after every app restart
 
 | Variable | Purpose |
 | --- | --- |
-| `SPRING_PROFILES_ACTIVE` | `local` for the disposable development database |
+| `SPRING_PROFILES_ACTIVE` | Defaults to `local`; deployments use `production` |
 | `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | Datasource configuration. `DATABASE_URL` must be a JDBC URL such as `jdbc:postgresql://host:5432/database?sslmode=require`. |
+| `DATABASE_MAX_POOL_SIZE` | Maximum application database connections; default `3` for constrained/free database tiers |
+| `DATABASE_MIN_IDLE` | Minimum idle database connections; default `0` so inactive instances release connections |
+| `DATABASE_CONNECTION_TIMEOUT_MS` | Maximum wait for a connection; default `10000` ms |
+| `DATABASE_IDLE_TIMEOUT_MS` | Idle connection retirement time; default `60000` ms |
+| `DATABASE_MAX_LIFETIME_MS` | Maximum connection lifetime; default `600000` ms |
 | `APP_ADMIN_EMAIL`, `APP_ADMIN_PASSWORD` | Optional initial administrator |
 | `APP_CORS_ALLOWED_ORIGINS` | Comma-separated exact frontend origins; default same-origin |
 | `APP_RATE_LIMIT_ENABLED` | Enable per-client API rate limiting; default `true` |
@@ -60,7 +67,7 @@ docker run --rm -p 8080:8080 -e SPRING_PROFILES_ACTIVE=local movies-api:0.0.1-SN
 ```
 
 The multi-stage build runs tests and packages the app, then uses a non-root Java 17
-runtime container. It selects no profile by default.
+runtime container. Azure deployment explicitly selects the `production` profile.
 
 ## Kubernetes
 
@@ -104,7 +111,7 @@ restore; destructive down-migrations are not generated automatically.
 ./mvnw test
 ```
 
-Tests cover migrations, persisted CRUD, filters, session/CSRF rotation, logout,
+Tests cover migrations, persisted CRUD, filters, session rotation, logout,
 account validation, ownership, rating integrity, membership/event idempotency,
 sharing expiry/revocation, audit writes, analytics validation and local ranking.
 The test profile uses H2; production-database and cluster tests remain separate.

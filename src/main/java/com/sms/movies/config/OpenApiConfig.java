@@ -81,7 +81,7 @@ public class OpenApiConfig {
   }
 
   private static boolean requiresAuthentication(String controller, String method) {
-    if (controller.equals("CsrfController") || controller.equals("SharedCollectionController")) {
+    if (controller.equals("SharedCollectionController")) {
       return false;
     }
     return !controller.equals("AuthController") || method.equals("login");
@@ -89,7 +89,6 @@ public class OpenApiConfig {
 
   private static boolean mayBeBadRequest(String controller, String method) {
     return !(controller.equals("AccountController")
-        || controller.equals("CsrfController")
         || (controller.equals("GenreController") && method.equals("list"))
         || (controller.equals("AuthController") && method.equals("logout")));
   }

@@ -41,8 +41,7 @@ class OpenApiConfigTest {
         target(GenreController.class, "create"),
         target(PersonController.class, "create"),
         target(SearchController.class, "discover"),
-        target(RecommendationController.class, "discover"),
-        target(CsrfController.class, "token"))) {
+        target(RecommendationController.class, "discover"))) {
       var operation = new Operation();
       customizer.customize(operation, target);
       assertNotNull(operation.getResponses().get("500"));

@@ -37,8 +37,7 @@ class SecurityComponentsTest {
     assertNotNull(config.passwordEncoder());
     assertNotNull(config.authenticationManager(config.userDetailsService(repository), config.passwordEncoder()));
     assertNotNull(config.securityContextRepository());
-    assertNotNull(config.csrfTokenRepository());
-    assertNotNull(config.sessionAuthenticationStrategy(config.csrfTokenRepository()));
+    assertNotNull(config.sessionAuthenticationStrategy());
   }
 
   @Test

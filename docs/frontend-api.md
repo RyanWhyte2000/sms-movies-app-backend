@@ -9,16 +9,13 @@ values and must not parse, increment or derive meaning from them.
 
 ## Authentication and browser setup
 
-The API uses server-side JDBC sessions, HttpOnly cookies and CSRF protection. HTTP
-Basic and HTML login redirects are disabled. Private endpoints return 401 without
-an authenticated session. Registering does not automatically log the user in.
+The API uses server-side JDBC sessions and HttpOnly cookies. HTTP Basic and HTML
+login redirects are disabled. Private endpoints return 401 without an authenticated
+session. Successful registration creates an authenticated session.
 
-1. `GET /api/csrf` with cookies enabled. Save `headerName` and `token`.
-2. Include that header/token and cookies on register and login requests.
-3. After login, fetch `/api/csrf` again: login rotates the session ID and CSRF token.
-4. Send cookies on all private requests and the new token on every write.
-5. POST logout with the token; the session is invalidated. Fetch a new CSRF token
-   before the next login.
+1. Send register or login requests with cookies enabled.
+2. Send cookies on all private requests.
+3. POST logout to invalidate the session.
 
 For fetch, use `credentials: "include"`. Same-origin deployment works by default.
 For a separate frontend origin, set `APP_CORS_ALLOWED_ORIGINS` to a comma-separated
@@ -27,12 +24,11 @@ For production HTTPS set `SERVER_SERVLET_SESSION_COOKIE_SECURE=true`; cross-site
 frontend/backend deployments also need a considered SameSite cookie configuration.
 Do not store passwords or session identifiers in localStorage.
 
-## Accounts — AuthController, AccountController, CsrfController
+## Accounts — AuthController, AccountController
 
 | Method | Path | Body / result |
 | --- | --- | --- |
-| GET | `/api/csrf` | `{headerName, token}`; anonymous access allowed |
-| POST | `/api/auth/register` | `{email, password, displayName}` → 201 user |
+| POST | `/api/auth/register` | `{email, password, displayName}` → 201 user + session cookie |
 | POST | `/api/auth/login` | `{email, password}` → 200 user + session cookie |
 | POST | `/api/auth/logout` | No body → 204 |
 | GET | `/api/me` | `{id: <UUID>, email, displayName, createdAt}` |
@@ -223,7 +219,7 @@ real provider ratings.
 Lists use `{content, page, size, totalElements, totalPages}`. Pages start at 0 and
 size is 1–100. Invalid body/query values return 400; body field errors have an
 `errors` map. Other errors use Problem Detail JSON: 401 for missing/invalid login,
-403 for forbidden operations/CSRF failures, 404 for missing or inaccessible
+403 for forbidden operations, 404 for missing or inaccessible
 resources, 409 for integrity conflicts and 500 for unexpected server failures.
 Swagger lists only the failure statuses applicable to each operation. Every request
 returns `X-Correlation-ID`.
@@ -234,7 +230,7 @@ one resource if retried; use PUT for collection membership and personal ratings.
 | --- | --- |
 | 400 | The operation accepts validated input, pagination, filters or UUID parameters |
 | 401 | The operation requires a session, or login credentials are invalid |
-| 403 | The operation is CSRF-protected or requires ADMIN authority |
+| 403 | The operation requires ADMIN authority |
 | 404 | The operation addresses a movie, collection, share or other owned resource |
 | 409 | Registration, analytics deduplication or a uniqueness constraint can conflict |
 | 500 | Any operation encounters an unexpected server failure |
